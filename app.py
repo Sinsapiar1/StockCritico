@@ -649,43 +649,156 @@ def show_progress_bar(current_step, total_steps):
     """, unsafe_allow_html=True)
 
 def show_main_kpis(analyzer):
-    """Muestra KPIs principales en cards atractivas"""
+    """Dashboard principal profesional con insights inteligentes"""
     
     metrics = analyzer.get_summary_metrics()
+    data = analyzer.data
     
+    # Header con contexto claro
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <h2 style="color: #2c3e50; margin-bottom: 0.5rem;">📊 Análisis de Cobertura de Stock</h2>
+        <p style="color: #7f8c8d; font-size: 1.1rem;">
+            Evaluación de días de cobertura basada en consumo histórico vs stock actual
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # KPIs principales con explicaciones
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown(f"""
         <div class="metric-container">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📦</div>
             <div class="metric-value">{metrics['total_productos']}</div>
-            <div class="metric-label">Total Productos</div>
+            <div class="metric-label">Productos Analizados</div>
+            <div style="color: #7f8c8d; font-size: 0.8rem; margin-top: 0.5rem;">
+                Con stock y consumo válidos
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
+        critical_pct = (metrics['productos_criticos'] / metrics['total_productos'] * 100) if metrics['total_productos'] > 0 else 0
+        urgency_icon = "🚨" if critical_pct > 15 else "⚠️" if critical_pct > 5 else "✅"
+        
         st.markdown(f"""
         <div class="metric-container" style="border-top-color: #ff6b6b;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">{urgency_icon}</div>
             <div class="metric-value" style="color: #ff6b6b;">{metrics['productos_criticos']}</div>
             <div class="metric-label">Stock Crítico</div>
+            <div style="color: #ff6b6b; font-size: 0.8rem; margin-top: 0.5rem;">
+                Requieren reposición inmediata
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
+        avg_coverage = data['dias_cobertura'].mean()
+        coverage_icon = "📈" if avg_coverage > 15 else "📊" if avg_coverage > 7 else "📉"
+        
         st.markdown(f"""
-        <div class="metric-container" style="border-top-color: #ffa726;">
-            <div class="metric-value" style="color: #ffa726;">{metrics['productos_bajo']}</div>
-            <div class="metric-label">Stock Bajo</div>
+        <div class="metric-container" style="border-top-color: #4ECDC4;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">{coverage_icon}</div>
+            <div class="metric-value" style="color: #4ECDC4;">{avg_coverage:.1f}</div>
+            <div class="metric-label">Días Cobertura Promedio</div>
+            <div style="color: #7f8c8d; font-size: 0.8rem; margin-top: 0.5rem;">
+                Stock actual ÷ consumo diario
+            </div>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
+        # Valor total en riesgo (productos críticos)
+        critical_products = data[data['estado_stock'] == 'CRÍTICO']
+        risk_value = (critical_products['stock'] * critical_products.get('precio', 0)).sum()
+        
         st.markdown(f"""
-        <div class="metric-container" style="border-top-color: #66bb6a;">
-            <div class="metric-value" style="color: #66bb6a; font-size: 1.8rem;">{metrics['porcentaje_critico']}</div>
-            <div class="metric-label">% Críticos</div>
+        <div class="metric-container" style="border-top-color: #FF8800;">
+            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">💰</div>
+            <div class="metric-value" style="color: #FF8800; font-size: 1.8rem;">{critical_pct:.1f}%</div>
+            <div class="metric-label">Productos en Riesgo</div>
+            <div style="color: #7f8c8d; font-size: 0.8rem; margin-top: 0.5rem;">
+                Del total de inventario
+            </div>
         </div>
         """, unsafe_allow_html=True)
+    
+    # Insights inteligentes
+    st.markdown("<br>", unsafe_allow_html=True)
+    show_intelligent_insights(data, metrics)
+
+def show_intelligent_insights(data, metrics):
+    """Muestra insights inteligentes basados en los datos"""
+    
+    # Análisis automático
+    critical_pct = (metrics['productos_criticos'] / metrics['total_productos'] * 100) if metrics['total_productos'] > 0 else 0
+    avg_coverage = data['dias_cobertura'].mean()
+    
+    # Productos más críticos por curva
+    curva_a_critical = len(data[(data['curva'] == 'A') & (data['estado_stock'] == 'CRÍTICO')])
+    curva_b_critical = len(data[(data['curva'] == 'B') & (data['estado_stock'] == 'CRÍTICO')])
+    
+    st.markdown("### 🧠 Insights Inteligentes")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Alerta principal
+        if critical_pct > 20:
+            alert_type = "error"
+            alert_icon = "🚨"
+            alert_msg = f"SITUACIÓN CRÍTICA: {critical_pct:.1f}% de productos requieren reposición inmediata"
+        elif critical_pct > 10:
+            alert_type = "warning" 
+            alert_icon = "⚠️"
+            alert_msg = f"ATENCIÓN REQUERIDA: {critical_pct:.1f}% de productos en estado crítico"
+        else:
+            alert_type = "success"
+            alert_icon = "✅"
+            alert_msg = f"SITUACIÓN CONTROLADA: Solo {critical_pct:.1f}% de productos críticos"
+        
+        st.markdown(f"""
+        <div class="alert-{alert_type}">
+            {alert_icon} <strong>{alert_msg}</strong>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Recomendación por curva A
+        if curva_a_critical > 0:
+            st.markdown(f"""
+            <div class="alert-warning">
+                🎯 <strong>PRIORIDAD ALTA:</strong> {curva_a_critical} productos Curva A en estado crítico
+                <br><small>Estos productos son estratégicos y requieren atención inmediata</small>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    with col2:
+        # Análisis de cobertura
+        if avg_coverage < 5:
+            coverage_status = "🔴 Cobertura muy baja"
+            coverage_msg = "La mayoría de productos se agotarán en menos de 5 días"
+        elif avg_coverage < 10:
+            coverage_status = "🟡 Cobertura moderada"  
+            coverage_msg = "Revisar políticas de reposición y frecuencia de pedidos"
+        else:
+            coverage_status = "🟢 Cobertura adecuada"
+            coverage_msg = "Los niveles de stock están dentro de rangos aceptables"
+        
+        st.markdown(f"""
+        <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; border-left: 4px solid #667eea;">
+            <strong>{coverage_status}</strong><br>
+            <small style="color: #6c757d;">{coverage_msg}</small>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Top 3 productos más críticos
+        top_critical = data[data['estado_stock'] == 'CRÍTICO'].nsmallest(3, 'dias_cobertura')
+        if len(top_critical) > 0:
+            st.markdown("**🔥 Más Urgentes:**")
+            for _, product in top_critical.iterrows():
+                st.markdown(f"• **{product['codigo']}** - {product['descripcion'][:25]}... ({product['dias_cobertura']:.1f} días)")
 
 def show_dashboard_tab(analyzer):
     """Tab del dashboard principal"""
@@ -734,36 +847,287 @@ def show_critical_tab(analyzer):
     )
 
 def show_detailed_tab(analyzer):
-    """Tab de análisis detallado"""
+    """Tab de análisis detallado completamente rediseñado"""
     
     data = analyzer.data
     
-    # Análisis por curva
-    st.subheader("📈 Análisis por Curva ABC")
+    st.markdown("### 🔍 Análisis Detallado por Segmentos")
     
-    curva_selected = st.selectbox(
-        "Selecciona una curva:",
-        options=['A', 'B', 'C'],
-        index=0
-    )
+    # Tabs secundarias para diferentes vistas
+    sub_tab1, sub_tab2, sub_tab3, sub_tab4 = st.tabs([
+        "📊 Por Curva ABC", 
+        "⚡ Por Estado", 
+        "🏷️ Por Familia",
+        "📈 Tendencias"
+    ])
     
+    with sub_tab1:
+        show_curva_analysis(analyzer, data)
+    
+    with sub_tab2:
+        show_status_analysis(analyzer, data)
+    
+    with sub_tab3:
+        show_family_analysis(analyzer, data)
+    
+    with sub_tab4:
+        show_trends_analysis(analyzer, data)
+
+def show_curva_analysis(analyzer, data):
+    """Análisis por curva ABC mejorado"""
+    
+    st.markdown("#### 🎯 Análisis por Importancia Estratégica (Curva ABC)")
+    
+    # Mostrar todas las curvas disponibles
+    available_curvas = sorted(data['curva'].unique())
+    
+    if len(available_curvas) == 0:
+        st.warning("No hay datos de curva ABC disponibles")
+        return
+    
+    # Selector mejorado
+    col1, col2 = st.columns([1, 3])
+    
+    with col1:
+        curva_selected = st.selectbox(
+            "🔍 Selecciona Curva:",
+            options=available_curvas,
+            index=0,
+            help="A: Productos críticos (80% valor), B: Importantes (15% valor), C: Normales (5% valor)"
+        )
+    
+    with col2:
+        # Explicación de cada curva
+        curva_info = {
+            'A': "🔴 **Productos Estratégicos** - Alta rotación, máxima prioridad",
+            'B': "🟡 **Productos Importantes** - Rotación media, prioridad moderada", 
+            'C': "🟢 **Productos Normales** - Baja rotación, menor prioridad"
+        }
+        st.markdown(curva_info.get(curva_selected, "Información no disponible"))
+    
+    # Obtener datos de la curva seleccionada
     curva_data = analyzer.get_products_by_curva(curva_selected)
     
-    if len(curva_data) > 0:
-        col1, col2, col3 = st.columns(3)
+    if len(curva_data) == 0:
+        st.warning(f"No hay productos en la Curva {curva_selected}")
+        return
+    
+    # Métricas de la curva seleccionada
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric(
+            "📦 Total Productos", 
+            len(curva_data),
+            help=f"Productos clasificados en Curva {curva_selected}"
+        )
+    
+    with col2:
+        critical_count = len(curva_data[curva_data['estado_stock'] == 'CRÍTICO'])
+        critical_pct = (critical_count / len(curva_data) * 100) if len(curva_data) > 0 else 0
+        st.metric(
+            "🚨 Críticos", 
+            critical_count,
+            delta=f"{critical_pct:.1f}%",
+            help="Productos que requieren reposición inmediata"
+        )
+    
+    with col3:
+        avg_coverage = curva_data['dias_cobertura'].mean()
+        st.metric(
+            "📊 Cobertura Promedio", 
+            f"{avg_coverage:.1f} días",
+            help="Días promedio hasta agotamiento"
+        )
+    
+    with col4:
+        total_stock_value = (curva_data['stock'] * curva_data.get('precio', 0)).sum()
+        st.metric(
+            "💰 Valor en Stock", 
+            f"${total_stock_value:,.0f}",
+            help="Valor total del inventario en esta curva"
+        )
+    
+    # Distribución por estado
+    st.markdown("#### 📊 Distribución por Estado de Stock")
+    
+    status_dist = curva_data['estado_stock'].value_counts()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Gráfico de distribución
+        fig_pie = px.pie(
+            values=status_dist.values,
+            names=status_dist.index,
+            title=f"Estados de Stock - Curva {curva_selected}",
+            color=status_dist.index,
+            color_discrete_map={
+                'CRÍTICO': '#FF4444',
+                'BAJO': '#FF8800',
+                'NORMAL': '#44AA44',
+                'ALTO': '#0088FF'
+            }
+        )
+        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+        st.plotly_chart(fig_pie, use_container_width=True)
+    
+    with col2:
+        # Tabla resumen por estado
+        st.markdown("**Resumen por Estado:**")
+        for estado, count in status_dist.items():
+            pct = (count / len(curva_data) * 100)
+            color_map = {
+                'CRÍTICO': '🔴',
+                'BAJO': '🟡', 
+                'NORMAL': '🟢',
+                'ALTO': '🔵'
+            }
+            icon = color_map.get(estado, '⚪')
+            st.markdown(f"{icon} **{estado}**: {count} productos ({pct:.1f}%)")
+    
+    # Tabla detallada con filtros
+    st.markdown("#### 📋 Productos Detallados")
+    
+    # Filtros
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        status_filter = st.multiselect(
+            "Filtrar por Estado:",
+            options=curva_data['estado_stock'].unique(),
+            default=curva_data['estado_stock'].unique()
+        )
+    
+    with col2:
+        min_coverage = st.number_input(
+            "Días mínimos de cobertura:",
+            min_value=0,
+            max_value=int(curva_data['dias_cobertura'].max()),
+            value=0
+        )
+    
+    with col3:
+        max_coverage = st.number_input(
+            "Días máximos de cobertura:",
+            min_value=0,
+            max_value=int(curva_data['dias_cobertura'].max()),
+            value=int(curva_data['dias_cobertura'].max())
+        )
+    
+    # Aplicar filtros
+    filtered_data = curva_data[
+        (curva_data['estado_stock'].isin(status_filter)) &
+        (curva_data['dias_cobertura'] >= min_coverage) &
+        (curva_data['dias_cobertura'] <= max_coverage)
+    ]
+    
+    # Mostrar datos filtrados
+    if len(filtered_data) > 0:
+        st.markdown(f"**Mostrando {len(filtered_data)} de {len(curva_data)} productos**")
         
-        with col1:
-            st.metric("Total Productos", len(curva_data))
+        # Ordenar por criticidad
+        display_data = filtered_data.sort_values(['estado_stock', 'dias_cobertura'])
         
-        with col2:
-            critical_count = len(curva_data[curva_data['estado_stock'] == 'CRÍTICO'])
-            st.metric("Productos Críticos", critical_count)
-        
-        with col3:
-            avg_coverage = curva_data['dias_cobertura'].mean()
-            st.metric("Cobertura Promedio", f"{avg_coverage:.1f} días")
-        
-        st.dataframe(curva_data, use_container_width=True, hide_index=True)
+        st.dataframe(
+            display_data[['codigo', 'descripcion', 'stock', 'consumo_diario', 'dias_cobertura', 'estado_stock']],
+            use_container_width=True,
+            hide_index=True,
+            column_config={
+                'codigo': st.column_config.TextColumn('Código', width='small'),
+                'descripcion': st.column_config.TextColumn('Descripción', width='large'),
+                'stock': st.column_config.NumberColumn('Stock', format='%.2f'),
+                'consumo_diario': st.column_config.NumberColumn('Consumo Diario', format='%.2f'),
+                'dias_cobertura': st.column_config.NumberColumn('Días Cobertura', format='%.1f'),
+                'estado_stock': st.column_config.TextColumn('Estado', width='small')
+            }
+        )
+    else:
+        st.warning("No hay productos que coincidan con los filtros seleccionados")
+
+def show_status_analysis(analyzer, data):
+    """Análisis por estado de stock"""
+    st.markdown("#### ⚡ Análisis por Estado de Stock")
+    
+    status_counts = data['estado_stock'].value_counts()
+    
+    for status in ['CRÍTICO', 'BAJO', 'NORMAL', 'ALTO']:
+        if status in status_counts.index:
+            status_data = data[data['estado_stock'] == status]
+            count = len(status_data)
+            pct = (count / len(data) * 100)
+            
+            with st.expander(f"{status} - {count} productos ({pct:.1f}%)", expanded=(status=='CRÍTICO')):
+                if len(status_data) > 0:
+                    avg_coverage = status_data['dias_cobertura'].mean()
+                    st.metric(f"Cobertura promedio - {status}", f"{avg_coverage:.1f} días")
+                    
+                    st.dataframe(
+                        status_data[['codigo', 'descripcion', 'curva', 'dias_cobertura']].head(10),
+                        use_container_width=True,
+                        hide_index=True
+                    )
+
+def show_family_analysis(analyzer, data):
+    """Análisis por familia de productos"""
+    st.markdown("#### 🏷️ Análisis por Familia de Productos")
+    
+    if 'familia' not in data.columns:
+        st.warning("No hay información de familias de productos disponible")
+        return
+    
+    family_analysis = data.groupby('familia').agg({
+        'codigo': 'count',
+        'dias_cobertura': 'mean',
+        'estado_stock': lambda x: (x == 'CRÍTICO').sum()
+    }).rename(columns={
+        'codigo': 'total_productos',
+        'dias_cobertura': 'cobertura_promedio',
+        'estado_stock': 'productos_criticos'
+    })
+    
+    family_analysis['pct_criticos'] = (family_analysis['productos_criticos'] / family_analysis['total_productos'] * 100)
+    family_analysis = family_analysis.sort_values('pct_criticos', ascending=False)
+    
+    st.dataframe(family_analysis, use_container_width=True)
+
+def show_trends_analysis(analyzer, data):
+    """Análisis de tendencias"""
+    st.markdown("#### 📈 Análisis de Tendencias y Proyecciones")
+    
+    # Distribución de días de cobertura
+    fig_hist = px.histogram(
+        data, 
+        x='dias_cobertura', 
+        nbins=20,
+        title="Distribución de Días de Cobertura",
+        labels={'dias_cobertura': 'Días de Cobertura', 'count': 'Cantidad de Productos'}
+    )
+    st.plotly_chart(fig_hist, use_container_width=True)
+    
+    # Análisis por rangos de cobertura
+    coverage_ranges = pd.cut(data['dias_cobertura'], 
+                           bins=[0, 3, 7, 15, 30, float('inf')], 
+                           labels=['0-3 días', '4-7 días', '8-15 días', '16-30 días', '30+ días'])
+    
+    range_analysis = coverage_ranges.value_counts().sort_index()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**Distribución por Rangos de Cobertura:**")
+        for range_name, count in range_analysis.items():
+            pct = (count / len(data) * 100)
+            st.markdown(f"• **{range_name}**: {count} productos ({pct:.1f}%)")
+    
+    with col2:
+        fig_bar = px.bar(
+            x=range_analysis.index,
+            y=range_analysis.values,
+            title="Productos por Rango de Cobertura",
+            labels={'x': 'Rango de Días', 'y': 'Cantidad de Productos'}
+        )
+        st.plotly_chart(fig_bar, use_container_width=True)
 
 def show_export_tab(analyzer, data):
     """Tab de exportación"""
