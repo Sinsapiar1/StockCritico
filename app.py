@@ -840,11 +840,11 @@ def show_critical_tab(analyzer):
     display_critical = critical_products.copy()
     display_critical = display_critical.round(2)
     
-        st.dataframe(
-            display_critical[['codigo', 'descripcion', 'curva', 'stock', 'consumo_diario', 'dias_cobertura', 'estado_stock']],
-            width='stretch',
-            hide_index=True
-        )
+    st.dataframe(
+        display_critical[['codigo', 'descripcion', 'curva', 'stock', 'consumo_diario', 'dias_cobertura', 'estado_stock']],
+        width='stretch',
+        hide_index=True
+    )
 
 def show_detailed_tab(analyzer):
     """Tab de análisis detallado completamente rediseñado"""
