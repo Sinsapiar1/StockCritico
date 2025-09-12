@@ -607,8 +607,8 @@ def show_results():
     # Tabs con análisis detallado
     tab1, tab2, tab3, tab4 = st.tabs([
         "📊 Dashboard Principal", 
-        "🚨 Stock Crítico", 
-        "📈 Análisis Detallado",
+        "🎯 Análisis por Curva ABC", 
+        "📈 Análisis Avanzado",
         "📤 Exportar Reportes"
     ])
     
@@ -616,10 +616,10 @@ def show_results():
         show_dashboard_tab(analyzer)
     
     with tab2:
-        show_critical_tab(analyzer)
+        show_curva_abc_tab(analyzer)
     
     with tab3:
-        show_detailed_tab(analyzer)
+        show_advanced_analysis_tab(analyzer)
     
     with tab4:
         show_export_tab(analyzer, data)
@@ -817,36 +817,259 @@ def show_dashboard_tab(analyzer):
     fig_critical = analyzer.create_critical_products_chart()
     st.plotly_chart(fig_critical, use_container_width=True)
 
-def show_critical_tab(analyzer):
-    """Tab de productos críticos"""
+def show_curva_abc_tab(analyzer):
+    """Tab dedicado al análisis por Curva ABC"""
     
-    critical_products = analyzer.get_critical_products()
+    data = analyzer.data
     
-    if len(critical_products) == 0:
-        st.markdown("""
-        <div class="alert-success">
-            🎉 <strong>¡Excelente!</strong> No hay productos en estado crítico en este momento.
+    st.markdown("""
+    ### 🎯 Análisis por Curva ABC - Consumo Estratégico
+    
+    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 2rem;">
+        <h4 style="color: #2c3e50; margin-bottom: 1rem;">💡 ¿Qué es la Curva ABC?</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+            <div style="text-align: center; padding: 1rem; background: white; border-radius: 8px; border-left: 4px solid #FF6B6B;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🔴</div>
+                <strong>Curva A</strong><br>
+                <small>80% del consumo<br>Productos MÁS consumidos<br>Máxima prioridad</small>
+            </div>
+            <div style="text-align: center; padding: 1rem; background: white; border-radius: 8px; border-left: 4px solid #4ECDC4;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🟡</div>
+                <strong>Curva B</strong><br>
+                <small>15% del consumo<br>Consumo moderado<br>Prioridad media</small>
+            </div>
+            <div style="text-align: center; padding: 1rem; background: white; border-radius: 8px; border-left: 4px solid #45B7D1;">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">🟢</div>
+                <strong>Curva C</strong><br>
+                <small>5% del consumo<br>Productos MENOS consumidos<br>Menor prioridad</small>
+            </div>
         </div>
-        """, unsafe_allow_html=True)
-        return
-    
-    st.markdown(f"""
-    <div class="alert-warning">
-        ⚠️ <strong>Atención:</strong> {len(critical_products)} productos requieren reposición inmediata
     </div>
     """, unsafe_allow_html=True)
     
-    # Tabla de productos críticos
-    display_critical = critical_products.copy()
-    display_critical = display_critical.round(2)
+    # Análisis por cada curva
+    available_curvas = sorted(data['curva'].unique())
     
-    st.dataframe(
-        display_critical[['codigo', 'descripcion', 'curva', 'stock', 'consumo_diario', 'dias_cobertura', 'estado_stock']],
-        width='stretch',
-        hide_index=True
+    # Mostrar distribución general
+    col1, col2, col3 = st.columns(3)
+    
+    for i, curva in enumerate(['A', 'B', 'C']):
+        curva_data = data[data['curva'] == curva] if curva in available_curvas else pd.DataFrame()
+        total_products = len(curva_data)
+        critical_count = len(curva_data[curva_data['estado_stock'] == 'CRÍTICO']) if len(curva_data) > 0 else 0
+        
+        with [col1, col2, col3][i]:
+            color = ['#FF6B6B', '#4ECDC4', '#45B7D1'][i]
+            icon = ['🔴', '🟡', '🟢'][i]
+            
+            st.markdown(f"""
+            <div style="background: white; padding: 1.5rem; border-radius: 10px; text-align: center; border-left: 4px solid {color};">
+                <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">{icon}</div>
+                <h3 style="color: {color}; margin-bottom: 0.5rem;">Curva {curva}</h3>
+                <div style="font-size: 1.8rem; font-weight: bold; color: #2c3e50;">{total_products}</div>
+                <div style="color: #7f8c8d; margin-bottom: 0.5rem;">Productos totales</div>
+                {f'<div style="color: #FF4444; font-weight: bold;">{critical_count} críticos</div>' if critical_count > 0 else '<div style="color: #44AA44;">Sin productos críticos</div>'}
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Selector de curva para análisis detallado
+    selected_curva = st.selectbox(
+        "🔍 Selecciona una curva para análisis detallado:",
+        options=available_curvas,
+        index=0 if 'A' in available_curvas else 0,
+        help="Selecciona la curva que quieres analizar en detalle"
     )
+    
+    # Mostrar análisis detallado de la curva seleccionada
+    show_detailed_curva_analysis(analyzer, data, selected_curva)
 
-def show_detailed_tab(analyzer):
+def show_detailed_curva_analysis(analyzer, data, curva):
+    """Análisis detallado de una curva específica"""
+    
+    curva_data = data[data['curva'] == curva]
+    
+    if len(curva_data) == 0:
+        st.warning(f"No hay productos en la Curva {curva}")
+        return
+    
+    # Información contextual
+    curva_info = {
+        'A': {
+            'title': '🔴 Curva A - Productos Estratégicos',
+            'description': 'Estos productos representan el 80% de tu consumo. Son críticos para la operación.',
+            'color': '#FF6B6B',
+            'priority': 'MÁXIMA PRIORIDAD'
+        },
+        'B': {
+            'title': '🟡 Curva B - Productos Importantes', 
+            'description': 'Representan el 15% del consumo. Importantes pero con menor rotación que A.',
+            'color': '#4ECDC4',
+            'priority': 'PRIORIDAD MEDIA'
+        },
+        'C': {
+            'title': '🟢 Curva C - Productos de Bajo Consumo',
+            'description': 'Solo el 5% del consumo total. Menor rotación y prioridad.',
+            'color': '#45B7D1', 
+            'priority': 'MENOR PRIORIDAD'
+        }
+    }
+    
+    info = curva_info.get(curva, curva_info['C'])
+    
+    st.markdown(f"""
+    <div style="background: {info['color']}15; padding: 1.5rem; border-radius: 10px; border-left: 4px solid {info['color']}; margin-bottom: 2rem;">
+        <h4 style="color: {info['color']}; margin-bottom: 0.5rem;">{info['title']}</h4>
+        <p style="color: #2c3e50; margin-bottom: 0.5rem;">{info['description']}</p>
+        <strong style="color: {info['color']};">🎯 {info['priority']}</strong>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Métricas de la curva
+    col1, col2, col3, col4 = st.columns(4)
+    
+    total_products = len(curva_data)
+    critical_count = len(curva_data[curva_data['estado_stock'] == 'CRÍTICO'])
+    avg_consumption = curva_data['consumo_diario'].mean()
+    avg_coverage = curva_data['dias_cobertura'].mean()
+    
+    with col1:
+        st.metric("📦 Total Productos", total_products)
+    
+    with col2:
+        st.metric("🚨 Productos Críticos", critical_count, 
+                 delta=f"{(critical_count/total_products*100):.1f}%" if total_products > 0 else "0%")
+    
+    with col3:
+        st.metric("⚡ Consumo Diario Promedio", f"{avg_consumption:.1f}")
+    
+    with col4:
+        st.metric("📊 Cobertura Promedio", f"{avg_coverage:.1f} días")
+    
+    # Estados de stock para esta curva
+    st.markdown("#### 📊 Distribución por Estado de Stock")
+    
+    status_dist = curva_data['estado_stock'].value_counts()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Gráfico de estados
+        fig_status = px.pie(
+            values=status_dist.values,
+            names=status_dist.index,
+            title=f"Estados de Stock - Curva {curva}",
+            color=status_dist.index,
+            color_discrete_map={
+                'CRÍTICO': '#FF4444',
+                'BAJO': '#FF8800', 
+                'NORMAL': '#44AA44',
+                'ALTO': '#0088FF'
+            }
+        )
+        fig_status.update_traces(textposition='inside', textinfo='percent+label')
+        st.plotly_chart(fig_status, use_container_width=True)
+    
+    with col2:
+        st.markdown("**Resumen por Estado:**")
+        for estado, count in status_dist.items():
+            pct = (count / total_products * 100) if total_products > 0 else 0
+            color_icons = {
+                'CRÍTICO': '🚨',
+                'BAJO': '⚠️',
+                'NORMAL': '✅', 
+                'ALTO': '📈'
+            }
+            icon = color_icons.get(estado, '⚪')
+            st.markdown(f"{icon} **{estado}**: {count} productos ({pct:.1f}%)")
+    
+    # Productos más críticos de esta curva
+    critical_products = curva_data[curva_data['estado_stock'] == 'CRÍTICO'].nsmallest(10, 'dias_cobertura')
+    
+    if len(critical_products) > 0:
+        st.markdown(f"#### 🚨 Productos Críticos en Curva {curva}")
+        st.markdown(f"""
+        <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; border-left: 4px solid #ffc107; margin-bottom: 1rem;">
+            <strong>⚠️ ATENCIÓN:</strong> {len(critical_products)} productos de Curva {curva} requieren reposición inmediata.
+            {' Estos son productos estratégicos de alto consumo.' if curva == 'A' else ''}
+        </div>
+        """, unsafe_allow_html=True)
+        
+        st.dataframe(
+            critical_products[['codigo', 'descripcion', 'stock', 'consumo_diario', 'dias_cobertura']],
+            width='stretch',
+            hide_index=True,
+            column_config={
+                'codigo': st.column_config.TextColumn('Código', width='small'),
+                'descripcion': st.column_config.TextColumn('Descripción', width='large'),
+                'stock': st.column_config.NumberColumn('Stock Actual', format='%.2f'),
+                'consumo_diario': st.column_config.NumberColumn('Consumo Diario', format='%.2f'),
+                'dias_cobertura': st.column_config.NumberColumn('Días Cobertura', format='%.1f')
+            }
+        )
+    else:
+        st.markdown(f"""
+        <div style="background: #d1edff; padding: 1rem; border-radius: 8px; border-left: 4px solid #0088ff;">
+            <strong>✅ Excelente:</strong> No hay productos críticos en Curva {curva}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Tabla completa con filtros
+    st.markdown(f"#### 📋 Todos los Productos - Curva {curva}")
+    
+    # Filtros
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        status_filter = st.multiselect(
+            "Filtrar por Estado:",
+            options=curva_data['estado_stock'].unique(),
+            default=curva_data['estado_stock'].unique(),
+            key=f"status_filter_{curva}"
+        )
+    
+    with col2:
+        sort_options = {
+            'Días de Cobertura (Menor a Mayor)': ('dias_cobertura', True),
+            'Días de Cobertura (Mayor a Menor)': ('dias_cobertura', False), 
+            'Consumo Diario (Mayor a Menor)': ('consumo_diario', False),
+            'Stock Actual (Mayor a Menor)': ('stock', False)
+        }
+        sort_choice = st.selectbox(
+            "Ordenar por:",
+            options=list(sort_options.keys()),
+            index=0,
+            key=f"sort_choice_{curva}"
+        )
+    
+    # Aplicar filtros
+    filtered_data = curva_data[curva_data['estado_stock'].isin(status_filter)]
+    
+    # Aplicar ordenamiento
+    sort_col, ascending = sort_options[sort_choice]
+    filtered_data = filtered_data.sort_values(sort_col, ascending=ascending)
+    
+    if len(filtered_data) > 0:
+        st.markdown(f"**Mostrando {len(filtered_data)} de {len(curva_data)} productos**")
+        
+        st.dataframe(
+            filtered_data[['codigo', 'descripcion', 'stock', 'consumo_diario', 'dias_cobertura', 'estado_stock']],
+            width='stretch',
+            hide_index=True,
+            column_config={
+                'codigo': st.column_config.TextColumn('Código', width='small'),
+                'descripcion': st.column_config.TextColumn('Descripción', width='large'),
+                'stock': st.column_config.NumberColumn('Stock', format='%.2f'),
+                'consumo_diario': st.column_config.NumberColumn('Consumo Diario', format='%.2f'),
+                'dias_cobertura': st.column_config.NumberColumn('Días Cobertura', format='%.1f'),
+                'estado_stock': st.column_config.TextColumn('Estado', width='small')
+            }
+        )
+    else:
+        st.warning("No hay productos que coincidan con los filtros seleccionados")
+
+def show_advanced_analysis_tab(analyzer):
     """Tab de análisis detallado completamente rediseñado"""
     
     data = analyzer.data
