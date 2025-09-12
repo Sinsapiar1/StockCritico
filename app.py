@@ -807,15 +807,15 @@ def show_dashboard_tab(analyzer):
     
     with col1:
         fig_status = analyzer.create_status_distribution_chart()
-        st.plotly_chart(fig_status, use_container_width=True)
+        st.plotly_chart(fig_status, use_container_width=True, key="dashboard_status_distribution")
     
     with col2:
         fig_curva = analyzer.create_coverage_by_curva_chart()
-        st.plotly_chart(fig_curva, use_container_width=True)
+        st.plotly_chart(fig_curva, use_container_width=True, key="dashboard_coverage_by_curva")
     
     # Gráfico de productos críticos
     fig_critical = analyzer.create_critical_products_chart()
-    st.plotly_chart(fig_critical, use_container_width=True)
+    st.plotly_chart(fig_critical, use_container_width=True, key="dashboard_critical_products")
 
 def show_curva_abc_tab(analyzer):
     """Tab dedicado al análisis por Curva ABC"""
@@ -843,6 +843,11 @@ def show_curva_abc_tab(analyzer):
                 <strong>Curva C</strong><br>
                 <small>5% del consumo<br>Productos MENOS consumidos<br>Menor prioridad</small>
             </div>
+        </div>
+        
+        <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; border-left: 4px solid #ffc107; margin-top: 1rem;">
+            <strong>🧠 Insight Clave:</strong> La Curva C suele tener MÁS productos críticos porque al consumirse poco, 
+            es fácil que se acumulen o que el stock no se rote adecuadamente, generando mayor criticidad.
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -969,7 +974,7 @@ def show_detailed_curva_analysis(analyzer, data, curva):
             }
         )
         fig_status.update_traces(textposition='inside', textinfo='percent+label')
-        st.plotly_chart(fig_status, use_container_width=True)
+        st.plotly_chart(fig_status, use_container_width=True, key=f"detailed_status_chart_curva_{curva}")
     
     with col2:
         st.markdown("**Resumen por Estado:**")
@@ -1193,7 +1198,7 @@ def show_curva_analysis(analyzer, data):
             }
         )
         fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.plotly_chart(fig_pie, use_container_width=True, key=f"pie_chart_curva_{curva_selected}")
     
     with col2:
         # Tabla resumen por estado
@@ -1326,7 +1331,7 @@ def show_trends_analysis(analyzer, data):
         title="Distribución de Días de Cobertura",
         labels={'dias_cobertura': 'Días de Cobertura', 'count': 'Cantidad de Productos'}
     )
-    st.plotly_chart(fig_hist, use_container_width=True)
+    st.plotly_chart(fig_hist, use_container_width=True, key="coverage_histogram")
     
     # Análisis por rangos de cobertura
     coverage_ranges = pd.cut(data['dias_cobertura'], 
@@ -1350,7 +1355,7 @@ def show_trends_analysis(analyzer, data):
             title="Productos por Rango de Cobertura",
             labels={'x': 'Rango de Días', 'y': 'Cantidad de Productos'}
         )
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, use_container_width=True, key="coverage_ranges_bar")
 
 def show_export_tab(analyzer, data):
     """Tab de exportación"""
