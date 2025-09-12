@@ -13,7 +13,9 @@ Sistema profesional para análisis de inventario basado en Curva ABC y cálculo 
 
 ## 🚀 Demo en Vivo
 
-[Ver Demo](https://tu-app.streamlit.app) _(disponible después del despliegue)_
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://tu-usuario-stock-analyzer-pro.streamlit.app)
+
+> 🎯 **Demo funcional disponible 24/7** - Sube tus archivos Excel y obtén análisis profesional en segundos
 
 ## 📋 Requisitos del Sistema
 

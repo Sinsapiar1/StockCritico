@@ -287,17 +287,30 @@ class ERPDataProcessor:
             df = pd.read_excel(file_path, header=None)
             print(f"Archivo stock leído: {df.shape[0]} filas, {df.shape[1]} columnas")
             
-            # Debug: mostrar estructura real
-            print("\n=== MUESTRA ARCHIVO STOCK ===")
-            for i in range(min(30, len(df))):
+            # Debug: mostrar estructura real con más detalle
+            print("\n=== MUESTRA ARCHIVO STOCK (DETALLADO) ===")
+            for i in range(min(50, len(df))):
                 row_values = []
-                for j in range(min(8, len(df.columns))):
+                for j in range(min(10, len(df.columns))):
                     cell = df.iloc[i, j]
                     if pd.notna(cell):
-                        row_values.append(f"Col{j}:'{str(cell)[:25]}'")
+                        cell_str = str(cell)[:30]
+                        # Detectar si parece código de producto
+                        is_code = False
+                        try:
+                            code = int(float(str(cell).strip()))
+                            if 1 <= code <= 999999:
+                                is_code = True
+                        except:
+                            pass
+                        
+                        marker = " [CÓDIGO?]" if is_code else ""
+                        row_values.append(f"Col{j}:'{cell_str}'{marker}")
                 
                 if row_values:
                     print(f"F{i:2d}: {' | '.join(row_values)}")
+                else:
+                    print(f"F{i:2d}: [VACÍA]")
             print("=== FIN MUESTRA STOCK ===\n")
             
             stock_data = []

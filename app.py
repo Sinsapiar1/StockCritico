@@ -525,19 +525,44 @@ def show_processing():
             st.rerun()
             
         except Exception as e:
+            error_msg = str(e)
             st.markdown(f"""
             <div class="alert-critical">
-                ❌ Error en el procesamiento: {str(e)}
+                ❌ Error en el procesamiento: {error_msg}
             </div>
             """, unsafe_allow_html=True)
             
-            if st.button("🔄 Reintentar", key="retry_processing"):
-                st.session_state.step = 3
-                st.rerun()
+            # Mostrar sugerencias según el tipo de error
+            if "stock" in error_msg.lower():
+                st.markdown("""
+                <div class="alert-warning">
+                    💡 <strong>Sugerencias para el archivo de Stock:</strong><br>
+                    • Verifica que el archivo contenga códigos de productos numéricos<br>
+                    • Asegúrate de que tenga columnas con descripciones y cantidades<br>
+                    • El archivo debe estar en formato Excel (.xlsx o .xls)<br>
+                    • Revisa que no tenga protección por contraseña
+                </div>
+                """, unsafe_allow_html=True)
+            elif "abc" in error_msg.lower():
+                st.markdown("""
+                <div class="alert-warning">
+                    💡 <strong>Sugerencias para el archivo Curva ABC:</strong><br>
+                    • Debe contener códigos de productos y consumos<br>
+                    • Verifica que tenga datos de clasificación ABC<br>
+                    • Asegúrate de que sea la exportación correcta del ERP
+                </div>
+                """, unsafe_allow_html=True)
             
-            if st.button("⬅️ Volver a Subir Archivos", key="back_to_upload"):
-                st.session_state.step = 1
-                st.rerun()
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🔄 Reintentar", key="retry_processing"):
+                    st.session_state.step = 3
+                    st.rerun()
+            
+            with col2:
+                if st.button("⬅️ Volver a Subir Archivos", key="back_to_upload"):
+                    st.session_state.step = 1
+                    st.rerun()
 
 def show_results():
     """Paso 4: Mostrar resultados del análisis"""
