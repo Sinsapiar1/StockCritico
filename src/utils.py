@@ -37,6 +37,9 @@ class ExcelExporter:
             
             # Hoja 5: Métricas por Curva
             self._create_curva_metrics_sheet(writer, data)
+            
+            # Hoja 6: Análisis de Stock Actual
+            self._create_stock_analysis_sheet(writer, data)
         
         output.seek(0)
         return output
@@ -215,6 +218,94 @@ class ExcelExporter:
         # Formatear
         for col_num, value in enumerate(curva_stats.columns.values):
             ws.write(2, col_num, value, self.formats['header'])
+    
+    def _create_stock_analysis_sheet(self, writer, data):
+        """Crea hoja de análisis de stock actual"""
+        ws = writer.book.add_worksheet('Análisis Stock Actual')
+        
+        ws.merge_range('A1:G1', 'ANÁLISIS DE STOCK ACTUAL - DÍAS DE COBERTURA', self.formats['title'])
+        
+        # Preparar datos de stock con análisis de cobertura
+        stock_analysis = []
+        
+        for _, row in data.iterrows():
+            codigo = row['codigo']
+            descripcion = row['descripcion']
+            stock_actual = row['stock']
+            
+            # Verificar si hay datos de consumo
+            if 'consumo_diario' in row and pd.notna(row['consumo_diario']) and row['consumo_diario'] > 0:
+                consumo_diario = row['consumo_diario']
+                dias_cobertura = stock_actual / consumo_diario if consumo_diario > 0 else 0
+                estado_cobertura = row.get('estado_stock', 'NORMAL')
+                observacion = f"Cobertura: {dias_cobertura:.1f} días"
+            else:
+                consumo_diario = "N/A"
+                dias_cobertura = "N/A"
+                estado_cobertura = "SIN DATOS CONSUMO"
+                observacion = "No hay datos de consumo disponibles"
+            
+            stock_analysis.append([
+                codigo,
+                descripcion,
+                stock_actual,
+                consumo_diario,
+                dias_cobertura,
+                estado_cobertura,
+                observacion
+            ])
+        
+        # Headers
+        headers = ['Código', 'Descripción', 'Stock Actual', 'Consumo Diario', 'Días Cobertura', 'Estado', 'Observaciones']
+        
+        for col_num, header in enumerate(headers):
+            ws.write(2, col_num, header, self.formats['header'])
+        
+        # Datos
+        for row_num, row_data in enumerate(stock_analysis, 3):
+            for col_num, value in enumerate(row_data):
+                # Formatear según el estado
+                if col_num == 5:  # Columna de estado
+                    if value == 'CRÍTICO':
+                        cell_format = self.formats['critical']
+                    elif value == 'BAJO':
+                        cell_format = self.formats['warning']
+                    elif value == 'SIN DATOS CONSUMO':
+                        cell_format = self.formats['border']  # Formato neutro
+                    else:
+                        cell_format = self.formats['normal']
+                else:
+                    cell_format = self.formats['border']
+                
+                ws.write(row_num, col_num, value, cell_format)
+        
+        # Ajustar anchos de columna
+        ws.set_column('A:A', 10)  # Código
+        ws.set_column('B:B', 40)  # Descripción
+        ws.set_column('C:C', 12)  # Stock Actual
+        ws.set_column('D:D', 15)  # Consumo Diario
+        ws.set_column('E:E', 12)  # Días Cobertura
+        ws.set_column('F:F', 15)  # Estado
+        ws.set_column('G:G', 30)  # Observaciones
+        
+        # Agregar resumen al final
+        summary_row = len(stock_analysis) + 5
+        
+        ws.merge_range(f'A{summary_row}:G{summary_row}', 'RESUMEN DE STOCK ACTUAL', self.formats['title'])
+        
+        # Calcular estadísticas
+        total_productos = len(stock_analysis)
+        productos_con_consumo = len([x for x in stock_analysis if x[3] != "N/A"])
+        productos_sin_consumo = total_productos - productos_con_consumo
+        
+        ws.write(summary_row + 1, 0, 'Total de Productos:', self.formats['header'])
+        ws.write(summary_row + 1, 1, total_productos, self.formats['border'])
+        
+        ws.write(summary_row + 2, 0, 'Con Datos de Consumo:', self.formats['header'])
+        ws.write(summary_row + 2, 1, productos_con_consumo, self.formats['border'])
+        
+        ws.write(summary_row + 3, 0, 'Sin Datos de Consumo:', self.formats['header'])
+        ws.write(summary_row + 3, 1, productos_sin_consumo, self.formats['border'])
     
     def _generate_replenishment_data(self, data):
         """Genera datos de reposición"""

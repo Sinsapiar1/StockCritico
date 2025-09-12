@@ -822,9 +822,9 @@ def show_curva_abc_tab(analyzer):
     
     data = analyzer.data
     
-    st.markdown("""
-    ### 🎯 Análisis por Curva ABC - Consumo Estratégico
+    st.markdown("### 🎯 Análisis por Curva ABC - Consumo Estratégico")
     
+    st.markdown("""
     <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 2rem;">
         <h4 style="color: #2c3e50; margin-bottom: 1rem;">💡 ¿Qué es la Curva ABC?</h4>
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
@@ -844,11 +844,13 @@ def show_curva_abc_tab(analyzer):
                 <small>5% del consumo<br>Productos MENOS consumidos<br>Menor prioridad</small>
             </div>
         </div>
-        
-        <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; border-left: 4px solid #ffc107; margin-top: 1rem;">
-            <strong>🧠 Insight Clave:</strong> La Curva C suele tener MÁS productos críticos porque al consumirse poco, 
-            es fácil que se acumulen o que el stock no se rote adecuadamente, generando mayor criticidad.
-        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; border-left: 4px solid #ffc107; margin-bottom: 2rem;">
+        <strong>🧠 Insight Clave:</strong> La Curva C suele tener MÁS productos críticos porque al consumirse poco, 
+        es fácil que se acumulen o que el stock no se rote adecuadamente, generando mayor criticidad.
     </div>
     """, unsafe_allow_html=True)
     
@@ -879,11 +881,20 @@ def show_curva_abc_tab(analyzer):
     
     st.markdown("<br>", unsafe_allow_html=True)
     
+    # Explicación si solo hay una curva
+    if len(available_curvas) == 1:
+        st.markdown(f"""
+        <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; border-left: 4px solid #2196f3; margin-bottom: 1rem;">
+            <strong>ℹ️ Información:</strong> En tu análisis actual solo aparece <strong>Curva {available_curvas[0]}</strong>. 
+            Esto significa que todos los productos analizados están clasificados en esta categoría según su nivel de consumo.
+        </div>
+        """, unsafe_allow_html=True)
+    
     # Selector de curva para análisis detallado
     selected_curva = st.selectbox(
         "🔍 Selecciona una curva para análisis detallado:",
         options=available_curvas,
-        index=0 if 'A' in available_curvas else 0,
+        index=0,
         help="Selecciona la curva que quieres analizar en detalle"
     )
     
