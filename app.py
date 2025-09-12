@@ -840,11 +840,11 @@ def show_critical_tab(analyzer):
     display_critical = critical_products.copy()
     display_critical = display_critical.round(2)
     
-    st.dataframe(
-        display_critical[['codigo', 'descripcion', 'curva', 'stock', 'consumo_diario', 'dias_cobertura', 'estado_stock']],
-        use_container_width=True,
-        hide_index=True
-    )
+        st.dataframe(
+            display_critical[['codigo', 'descripcion', 'curva', 'stock', 'consumo_diario', 'dias_cobertura', 'estado_stock']],
+            width='stretch',
+            hide_index=True
+        )
 
 def show_detailed_tab(analyzer):
     """Tab de análisis detallado completamente rediseñado"""
@@ -1031,7 +1031,7 @@ def show_curva_analysis(analyzer, data):
         
         st.dataframe(
             display_data[['codigo', 'descripcion', 'stock', 'consumo_diario', 'dias_cobertura', 'estado_stock']],
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
             column_config={
                 'codigo': st.column_config.TextColumn('Código', width='small'),
@@ -1064,7 +1064,7 @@ def show_status_analysis(analyzer, data):
                     
                     st.dataframe(
                         status_data[['codigo', 'descripcion', 'curva', 'dias_cobertura']].head(10),
-                        use_container_width=True,
+                        width='stretch',
                         hide_index=True
                     )
 
@@ -1089,7 +1089,7 @@ def show_family_analysis(analyzer, data):
     family_analysis['pct_criticos'] = (family_analysis['productos_criticos'] / family_analysis['total_productos'] * 100)
     family_analysis = family_analysis.sort_values('pct_criticos', ascending=False)
     
-    st.dataframe(family_analysis, use_container_width=True)
+    st.dataframe(family_analysis, width='stretch')
 
 def show_trends_analysis(analyzer, data):
     """Análisis de tendencias"""
