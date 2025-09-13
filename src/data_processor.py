@@ -640,11 +640,17 @@ class ERPDataProcessor:
             )
             
             # Completar datos faltantes para productos sin consumo
-            analysis['descripcion'] = analysis['descripcion'].fillna('Sin descripción en ABC')
+            # Usar descripción del stock si no está en ABC
+            for idx, row in analysis.iterrows():
+                if pd.isna(row['descripcion']) or row['descripcion'] == '':
+                    # Buscar descripción en stock_data original
+                    stock_desc = self.stock_data[self.stock_data['codigo'] == row['codigo']]['descripcion'].iloc[0] if len(self.stock_data[self.stock_data['codigo'] == row['codigo']]) > 0 else 'Producto en inventario'
+                    analysis.at[idx, 'descripcion'] = stock_desc
+            
             analysis['unidad'] = analysis['unidad'].fillna('Und')
             analysis['consumo'] = analysis['consumo'].fillna(0)
-            analysis['curva'] = analysis['curva'].fillna('Sin Curva')
-            analysis['servicio'] = analysis['servicio'].fillna('Sin Servicio')
+            analysis['curva'] = analysis['curva'].fillna('NO CONSUMIDO')  # Más claro
+            analysis['servicio'] = analysis['servicio'].fillna('No consumido en período')
             analysis['consumo_diario'] = analysis['consumo_diario'].fillna(0)
             
             print(f"✅ Productos después del merge: {len(analysis)}")
@@ -713,7 +719,7 @@ class ERPDataProcessor:
             
             # Productos sin consumo en el período
             if consumo_diario == 0 or dias >= 999:
-                return 'SIN CONSUMO EN PERÍODO'
+                return 'NO CONSUMIDO (01/09-08/09)'
             
             # Umbrales por curva para productos con consumo
             umbrales = {'A': 3, 'B': 5, 'C': 7}

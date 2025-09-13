@@ -291,6 +291,9 @@ def show_hero_header():
     <div class="hero-header">
         <div class="hero-title">🎯 Stock Analyzer Pro</div>
         <div class="hero-subtitle">Sistema Inteligente de Análisis de Inventario Crítico</div>
+        <div style="margin-top: 1rem; font-size: 0.9rem; opacity: 0.8;">
+            Desarrollado por <strong>Adeodato Cornejo</strong> | Análisis Experto de Stock vs Consumo
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -638,6 +641,18 @@ def show_results():
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             st.rerun()
+    
+    # Footer profesional
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="text-align: center; padding: 2rem; background: #f8f9fa; border-radius: 10px; margin-top: 3rem;">
+        <div style="color: #6c757d; font-size: 0.9rem;">
+            <strong>🎯 Stock Analyzer Pro</strong> - Sistema Experto de Análisis de Inventario<br>
+            Desarrollado por <strong style="color: #667eea;">Adeodato Cornejo</strong><br>
+            <small>Análisis inteligente de stock vs consumo | Metodología experta en gestión de inventarios</small>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 def show_progress_bar(current_step, total_steps):
     """Muestra barra de progreso del flujo"""
@@ -922,14 +937,27 @@ def show_services_analysis_tab(analyzer):
         unique_services = data['servicio'].nunique()
         total_products = len(data)
         
-        st.markdown(f"""
-        <div style="background: #e8f5e8; padding: 1rem; border-radius: 8px; border-left: 4px solid #28a745; margin-bottom: 2rem;">
-            <strong>📊 Resumen del Análisis:</strong><br>
-            • <strong>{total_products}</strong> productos analizados<br>
-            • <strong>{unique_services}</strong> servicios diferentes detectados<br>
-            • Período: <strong>8 días</strong> (01/09 - 08/09/2025)
+    # Calcular estadísticas para mostrar
+    productos_con_consumo = len(data[data['consumo_diario'] > 0])
+    productos_sin_consumo = len(data[data['consumo_diario'] == 0])
+    
+    st.markdown(f"""
+    <div style="background: #e8f5e8; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #28a745; margin-bottom: 2rem;">
+        <h4 style="color: #2c3e50; margin-bottom: 1rem;">📊 Resumen Completo del Análisis</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div>
+                <strong>📦 Stock Total:</strong> {total_products} productos<br>
+                <strong>📅 Período:</strong> 8 días (01/09 - 08/09/2025)<br>
+                <strong>🍽️ Servicios:</strong> {unique_services} detectados
+            </div>
+            <div>
+                <strong>✅ Con Consumo:</strong> {productos_con_consumo} productos<br>
+                <strong>📋 Sin Consumo:</strong> {productos_sin_consumo} productos<br>
+                <small style="color: #6c757d;">Productos en inventario pero no consumidos en el período</small>
+            </div>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    """, unsafe_allow_html=True)
     
     # Verificar si hay información de servicios
     if 'servicio' not in data.columns:

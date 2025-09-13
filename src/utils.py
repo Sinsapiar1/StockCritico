@@ -82,7 +82,7 @@ class ExcelExporter:
         
         # Título principal
         ws.merge_range('A1:F1', 'ANÁLISIS DE STOCK CRÍTICO - RESUMEN EJECUTIVO', self.formats['title'])
-        ws.merge_range('A2:F2', f'Generado el: {datetime.now().strftime("%d/%m/%Y %H:%M")}', self.formats['border'])
+        ws.merge_range('A2:F2', f'Generado el: {datetime.now().strftime("%d/%m/%Y %H:%M")} | Desarrollado por Adeodato Cornejo', self.formats['border'])
         
         # KPIs principales
         ws.write('A4', 'INDICADORES CLAVE', self.formats['header'])
@@ -249,7 +249,10 @@ class ExcelExporter:
             estado_cobertura = row['estado_stock']
             curva = row['curva']
             
-            observacion = f"Período: 01/09-08/09/2025 (8 días). Consumo promedio calculado."
+            if consumo_diario > 0:
+                observacion = f"Período: 01/09-08/09/2025 (8 días). Consumo: {consumo_diario:.2f}/día"
+            else:
+                observacion = f"Producto en inventario pero NO consumido en período 01/09-08/09/2025"
             
             stock_analysis.append([
                 codigo,
@@ -277,10 +280,10 @@ class ExcelExporter:
                         cell_format = self.formats['critical']
                     elif value == 'BAJO':
                         cell_format = self.formats['warning']
-                    elif value == 'SIN CONSUMO EN PERÍODO':
+                    elif 'NO CONSUMIDO' in str(value):
                         # Crear formato especial para sin consumo
                         no_consumption_format = self.workbook.add_format({
-                            'bg_color': '#E6E6FA', 'font_color': '#4B0082', 'border': 1
+                            'bg_color': '#F0F8FF', 'font_color': '#4169E1', 'border': 1, 'italic': True
                         })
                         cell_format = no_consumption_format
                     else:
@@ -330,8 +333,10 @@ class ExcelExporter:
         ws.merge_range(f'A{summary_row + 6}:H{summary_row + 6}', 'EXPLICACIÓN DE ESTADOS', self.formats['header'])
         ws.write(summary_row + 7, 0, 'CRÍTICO:', self.formats['critical'])
         ws.write(summary_row + 7, 1, 'Stock se agotará pronto según consumo', self.formats['border'])
-        ws.write(summary_row + 8, 0, 'SIN CONSUMO:', self.formats['border'])
-        ws.write(summary_row + 8, 1, 'No se consumió en período 01/09-08/09/2025', self.formats['border'])
+        ws.write(summary_row + 8, 0, 'NO CONSUMIDO:', self.formats['border'])
+        ws.write(summary_row + 8, 1, 'Productos en inventario pero no consumidos en período', self.formats['border'])
+        ws.write(summary_row + 9, 0, 'NOTA:', self.formats['header'])
+        ws.write(summary_row + 9, 1, 'Los productos no consumidos mantienen su stock sin rotación', self.formats['border'])
     
     def _generate_replenishment_data(self, data):
         """Genera datos de reposición"""
