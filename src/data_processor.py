@@ -638,22 +638,22 @@ class ERPDataProcessor:
         
         return df.reset_index(drop=True)
     
-        def calculate_coverage_analysis(self, days_period: int = 8) -> pd.DataFrame:
+    def calculate_coverage_analysis(self, days_period: int = 8) -> pd.DataFrame:
         print(f"\n🚨 INICIANDO ANÁLISIS DE COBERTURA")
         print(f"📊 ABC disponible: {len(self.curva_abc_data) if self.curva_abc_data is not None else 'None'}")
         print(f"📦 Stock disponible: {len(self.stock_data) if self.stock_data is not None else 'None'}")
         
-        if self.curva_abc_data is None or self.stock_data is None:
-            raise Exception("Debe procesar ambos archivos primero")
-        
-        print(f"\n=== ANÁLISIS EXPERTO DE COBERTURA ===")
-        print(f"📊 Productos Curva ABC: {len(self.curva_abc_data)}")
-        print(f"📦 Productos Stock: {len(self.stock_data)}")
-        print(f"📅 Período de análisis: {days_period} días")
-        
-        # PASO 1: Consolidar consumo por código con debugging detallado
-        print(f"\n🔄 PASO 1: Consolidando consumo por producto...")
         try:
+            if self.curva_abc_data is None or self.stock_data is None:
+                raise Exception("Debe procesar ambos archivos primero")
+            
+            print(f"\n=== ANÁLISIS EXPERTO DE COBERTURA ===")
+            print(f"📊 Productos Curva ABC: {len(self.curva_abc_data)}")
+            print(f"📦 Productos Stock: {len(self.stock_data)}")
+            print(f"📅 Período de análisis: {days_period} días")
+            
+            # Consolidar consumo por código (sumar todos los servicios)
+            print(f"\n🔄 Consolidando consumo por producto...")
             consumo_consolidado = self.curva_abc_data.groupby('codigo').agg({
                 'descripcion': 'first',
                 'unidad': 'first', 
@@ -664,64 +664,22 @@ class ERPDataProcessor:
             
             print(f"✅ Productos consolidados: {len(consumo_consolidado)}")
             
-            # Debug productos específicos en consolidación
-            for code in ['453', '641']:
-                if code in consumo_consolidado['codigo'].values:
-                    row = consumo_consolidado[consumo_consolidado['codigo'] == code].iloc[0]
-                    print(f"   ✅ {code}: {row['descripcion']} - Consumo: {row['consumo']}")
-                else:
-                    print(f"   ❌ {code}: NO encontrado en consolidación")
-                    
-        except Exception as e:
-            print(f"💥 ERROR EN PASO 1: {str(e)}")
-            raise e
-        
-        # PASO 2: Calcular consumo promedio diario
-        print(f"\n🧮 PASO 2: Calculando consumo promedio diario...")
-        try:
+            # Calcular consumo promedio diario EXPERTO
+            print(f"🧮 Calculando consumo promedio diario...")
             consumo_consolidado['consumo_diario'] = consumo_consolidado['consumo'] / days_period
             
             # Mostrar ejemplos del cálculo
             top_consumers = consumo_consolidado.nlargest(3, 'consumo')
             for _, product in top_consumers.iterrows():
                 print(f"   📈 {product['codigo']}: {product['consumo']:.1f} total ÷ {days_period} días = {product['consumo_diario']:.2f}/día")
-                
-            # Debug productos específicos después del cálculo diario
-            for code in ['453', '641']:
-                if code in consumo_consolidado['codigo'].values:
-                    row = consumo_consolidado[consumo_consolidado['codigo'] == code].iloc[0]
-                    print(f"   ✅ {code}: Consumo diario = {row['consumo_diario']:.2f}")
-                else:
-                    print(f"   ❌ {code}: NO encontrado para cálculo diario")
-                    
-        except Exception as e:
-            print(f"💥 ERROR EN PASO 2: {str(e)}")
-            raise e
-        
-        # PASO 3: Preparar datos para merge
-        print(f"\n🔗 PASO 3: Preparando datos para merge...")
-        try:
+            
+            # Hacer merge con stock (OUTER join para incluir TODOS los productos de stock)
+            print(f"\n🔗 Cruzando datos ABC con Stock...")
+            
             # Asegurar que códigos sean strings para merge correcto
-            print(f"   🔧 Limpiando códigos para merge...")
             consumo_consolidado['codigo'] = consumo_consolidado['codigo'].astype(str).str.strip()
             self.stock_data['codigo'] = self.stock_data['codigo'].astype(str).str.strip()
             
-            print(f"   📊 Consumo consolidado: {len(consumo_consolidado)} productos")
-            print(f"   📦 Stock data: {len(self.stock_data)} productos")
-            
-            # Verificar que los códigos problema están en ambos DataFrames antes del merge
-            for code in ['453', '641']:
-                in_consumo = code in consumo_consolidado['codigo'].values
-                in_stock = code in self.stock_data['codigo'].values
-                print(f"   🔍 {code}: Consumo={in_consumo}, Stock={in_stock}")
-                
-        except Exception as e:
-            print(f"💥 ERROR EN PASO 3: {str(e)}")
-            raise e
-        
-        # PASO 4: Realizar merge con debugging detallado
-        print(f"\n🔀 PASO 4: Realizando merge RIGHT JOIN...")
-        try:
             analysis = pd.merge(
                 consumo_consolidado,
                 self.stock_data[['codigo', 'descripcion', 'stock', 'familia']],  # Incluir descripción del stock
@@ -730,24 +688,7 @@ class ERPDataProcessor:
                 suffixes=('_abc', '_stock')  # Distinguir columnas duplicadas
             )
             
-            print(f"✅ Merge completado: {len(analysis)} productos")
-            
-            # Debug inmediato después del merge
-            for code in ['453', '641']:
-                if code in analysis['codigo'].values:
-                    print(f"   ✅ {code}: PRESENTE en merge")
-                else:
-                    print(f"   ❌ {code}: AUSENTE después del merge")
-                    
-        except Exception as e:
-            print(f"💥 ERROR EN PASO 4 (MERGE): {str(e)}")
-            print(f"   Columnas consumo_consolidado: {list(consumo_consolidado.columns)}")
-            print(f"   Columnas self.stock_data: {list(self.stock_data.columns)}")
-            raise e
-        
-        # PASO 5: Completar datos faltantes
-        print(f"\n🛠️ PASO 5: Completando datos faltantes...")
-        try:
+            # Completar datos faltantes para productos sin consumo
             # Usar descripción del stock cuando no hay en ABC
             analysis['descripcion'] = analysis['descripcion_abc'].fillna(analysis['descripcion_stock'])
             analysis['descripcion'] = analysis['descripcion'].fillna('Producto en inventario')
@@ -761,132 +702,104 @@ class ERPDataProcessor:
             analysis['servicio'] = analysis['servicio'].fillna('No consumido en período')
             analysis['consumo_diario'] = analysis['consumo_diario'].fillna(0)
             
-            print(f"✅ Datos completados: {len(analysis)} productos")
+            print(f"✅ Productos después del merge: {len(analysis)}")
             
-            # Debug después de completar datos
-            for code in ['453', '641']:
-                if code in analysis['codigo'].values:
-                    row = analysis[analysis['codigo'] == code].iloc[0]
-                    print(f"   ✅ {code}: {row['descripcion']} - Consumo diario: {row['consumo_diario']:.2f}")
-                else:
-                    print(f"   ❌ {code}: NO encontrado después de completar datos")
-                    
-        except Exception as e:
-            print(f"💥 ERROR EN PASO 5: {str(e)}")
-            raise e
-        
-        # PASO 6: Calcular días de cobertura
-        print(f"\n⏱️ PASO 6: Calculando días de cobertura...")
-        try:
+            if len(analysis) == 0:
+                raise Exception("No hay productos en común entre Curva ABC y Stock. Verificar códigos de productos.")
+            
+            # Calcular días de cobertura EXPERTO (incluyendo productos sin consumo)
+            print(f"\n⏱️  Calculando días de cobertura...")
             analysis['dias_cobertura'] = analysis.apply(
                 lambda row: row['stock'] / row['consumo_diario'] 
                 if row['consumo_diario'] > 0 else 999, axis=1  # 999 = Sin consumo en período
             )
             
-            print(f"✅ Días de cobertura calculados")
+            # Contar productos con y sin consumo
+            productos_con_consumo = len(analysis[analysis['consumo_diario'] > 0])
+            productos_sin_consumo = len(analysis[analysis['consumo_diario'] == 0])
             
-            # Debug después de calcular cobertura
-            for code in ['453', '641']:
-                if code in analysis['codigo'].values:
-                    row = analysis[analysis['codigo'] == code].iloc[0]
-                    print(f"   ✅ {code}: Stock={row['stock']}, Consumo diario={row['consumo_diario']:.2f}, Cobertura={row['dias_cobertura']:.1f} días")
-                else:
-                    print(f"   ❌ {code}: NO encontrado para cálculo cobertura")
-                    
-        except Exception as e:
-            print(f"💥 ERROR EN PASO 6: {str(e)}")
-            raise e
-        
-        # PASO 7: Clasificar estado y fecha de quiebre
-        print(f"\n🏷️ PASO 7: Clasificando estados...")
-        try:
+            print(f"\n📊 ESTADÍSTICAS COMPLETAS DEL ANÁLISIS:")
+            print(f"   • Total productos en stock original: {len(self.stock_data)}")
+            print(f"   • Total productos en análisis final: {len(analysis)}")
+            print(f"   • Con consumo en período: {productos_con_consumo}")
+            print(f"   • Sin consumo en período: {productos_sin_consumo}")
+            
+            # Debug: verificar productos faltantes
+            if len(analysis) < len(self.stock_data):
+                missing_count = len(self.stock_data) - len(analysis)
+                print(f"   ⚠️ ATENCIÓN: {missing_count} productos del stock no aparecen en análisis")
+                
+                # Encontrar productos faltantes
+                stock_codes = set(self.stock_data['codigo'].astype(str))
+                analysis_codes = set(analysis['codigo'].astype(str))
+                missing_codes = stock_codes - analysis_codes
+                
+                if missing_codes:
+                    print(f"   📋 Productos faltantes: {list(missing_codes)[:5]}...")  # Mostrar primeros 5
+            
+            # Estadísticas solo para productos con consumo
+            analysis_with_consumption = analysis[analysis['consumo_diario'] > 0]
+            if len(analysis_with_consumption) > 0:
+                print(f"   • Cobertura promedio (con consumo): {analysis_with_consumption['dias_cobertura'].mean():.1f} días")
+                print(f"   • Productos con <3 días: {len(analysis_with_consumption[analysis_with_consumption['dias_cobertura'] < 3])}")
+                print(f"   • Productos con <7 días: {len(analysis_with_consumption[analysis_with_consumption['dias_cobertura'] < 7])}")
+            
+            # Mostrar ejemplos del cálculo de cobertura
+            sample_with_consumption = analysis_with_consumption.head(3) if len(analysis_with_consumption) > 0 else pd.DataFrame()
+            for _, product in sample_with_consumption.iterrows():
+                print(f"   ⏰ {product['codigo']}: {product['stock']:.1f} stock ÷ {product['consumo_diario']:.2f}/día = {product['dias_cobertura']:.1f} días")
+            
+            # Ejemplos de productos sin consumo
+            sample_no_consumption = analysis[analysis['consumo_diario'] == 0].head(2)
+            for _, product in sample_no_consumption.iterrows():
+                print(f"   📦 {product['codigo']}: Sin consumo en período 01/09-08/09/2025")
+            
+            # Clasificar estado según curva ABC
             analysis['estado_stock'] = analysis.apply(self._classify_stock_status, axis=1)
+            
+            # Calcular fecha de quiebre
             analysis['fecha_quiebre'] = analysis.apply(self._calculate_breakage_date, axis=1)
             
-            print(f"✅ Estados clasificados")
+            print(f"Análisis completado con {len(analysis)} productos")
             
-            # Debug final de los productos problema
-            for code in ['453', '641']:
-                if code in analysis['codigo'].values:
-                    row = analysis[analysis['codigo'] == code].iloc[0]
-                    print(f"   ✅ {code}: Estado={row['estado_stock']}, Fecha quiebre={row['fecha_quiebre']}")
-                else:
-                    print(f"   ❌ {code}: NO encontrado para clasificación")
-                    
-        except Exception as e:
-            print(f"💥 ERROR EN PASO 7: {str(e)}")
-            raise e
-        
-        # ESTADÍSTICAS FINALES
-        print(f"\n📊 ESTADÍSTICAS COMPLETAS DEL ANÁLISIS:")
-        productos_con_consumo = len(analysis[analysis['consumo_diario'] > 0])
-        productos_sin_consumo = len(analysis[analysis['consumo_diario'] == 0])
-        
-        print(f"   • Total productos en stock original: {len(self.stock_data)}")
-        print(f"   • Total productos en análisis final: {len(analysis)}")
-        print(f"   • Con consumo en período: {productos_con_consumo}")
-        print(f"   • Sin consumo en período: {productos_sin_consumo}")
-        
-        # Verificar productos faltantes
-        if len(analysis) < len(self.stock_data):
-            missing_count = len(self.stock_data) - len(analysis)
-            print(f"   ⚠️ ATENCIÓN: {missing_count} productos del stock no aparecen en análisis")
-        
-        # Estadísticas solo para productos con consumo
-        analysis_with_consumption = analysis[analysis['consumo_diario'] > 0]
-        if len(analysis_with_consumption) > 0:
-            print(f"   • Cobertura promedio (con consumo): {analysis_with_consumption['dias_cobertura'].mean():.1f} días")
-            print(f"   • Productos con <3 días: {len(analysis_with_consumption[analysis_with_consumption['dias_cobertura'] < 3])}")
-            print(f"   • Productos con <7 días: {len(analysis_with_consumption[analysis_with_consumption['dias_cobertura'] < 7])}")
-        
-        # Mostrar distribución por estado
-        print("   • Distribución por estado:")
-        for estado, count in analysis['estado_stock'].value_counts().items():
-            print(f"     - {estado}: {count}")
-        
-        # DEBUG FINAL - PRODUCTOS ESPECÍFICOS
-        print(f"\n🔍 DEBUG FINAL - PRODUCTOS PROBLEMA:")
-        test_codes = ['453', '641']
-        
-        for code in test_codes:
-            print(f"\n📦 Producto {code}:")
+            # Mostrar estadísticas básicas
+            print("Distribución por estado:")
+            print(analysis['estado_stock'].value_counts())
             
-            # ¿Está en ABC?
-            in_abc = self.curva_abc_data['codigo'].astype(str).str.strip().eq(code).any()
-            print(f"   ABC: {'✅' if in_abc else '❌'}")
+            # DEBUG DIRECTO - TEMPORAL
+            print(f"\n🔍 DEBUG PRODUCTOS FALTANTES:")
+            test_codes = ['453', '641']
             
-            # ¿Está en Stock?
-            in_stock = self.stock_data['codigo'].astype(str).str.strip().eq(code).any()
-            print(f"   Stock: {'✅' if in_stock else '❌'}")
-            
-            # ¿Está en análisis final?
-            in_final = analysis['codigo'].astype(str).str.strip().eq(code).any()
-            print(f"   Final: {'✅' if in_final else '❌'}")
-            
-            if in_final:
-                row = analysis[analysis['codigo'].astype(str).str.strip() == code].iloc[0]
-                print(f"   Estado: {row['estado_stock']}")
-                print(f"   Descripción: {row['descripcion']}")
-                print(f"   Consumo: {row['consumo']}")
-                print(f"   Stock: {row['stock']}")
-                print(f"   Días cobertura: {row['dias_cobertura']:.1f}")
-            else:
-                print(f"   🚨 SE PERDIÓ EN EL PROCESO")
+            for code in test_codes:
+                print(f"\n📦 Producto {code}:")
                 
-                # Investigar dónde se perdió
-                if in_abc and not in_stock:
-                    print(f"   🔍 Causa: Producto está en ABC pero NO en Stock")
-                elif not in_abc and in_stock:
-                    print(f"   🔍 Causa: Producto está en Stock pero NO en ABC")
-                elif not in_abc and not in_stock:
-                    print(f"   🔍 Causa: Producto NO está en ninguno de los archivos")
+                # ¿Está en ABC?
+                in_abc = self.curva_abc_data['codigo'].astype(str).str.strip().eq(code).any()
+                print(f"   ABC: {'✅' if in_abc else '❌'}")
+                
+                # ¿Está en Stock?
+                in_stock = self.stock_data['codigo'].astype(str).str.strip().eq(code).any()
+                print(f"   Stock: {'✅' if in_stock else '❌'}")
+                
+                # ¿Está en análisis final?
+                in_final = analysis['codigo'].astype(str).str.strip().eq(code).any()
+                print(f"   Final: {'✅' if in_final else '❌'}")
+                
+                if in_final:
+                    row = analysis[analysis['codigo'].astype(str).str.strip() == code].iloc[0]
+                    print(f"   Estado: {row['estado_stock']}")
+                    print(f"   Descripción: {row['descripcion']}")
+                    print(f"   Consumo: {row['consumo']}")
                 else:
-                    print(f"   🔍 Causa: Error en el merge - está en ambos pero se perdió")
-        
-        print(f"\n🎉 ANÁLISIS COMPLETADO EXITOSAMENTE - {len(analysis)} productos procesados")
-        
-        self.consolidated_data = analysis
-        return analysis
+                    print(f"   🚨 SE PERDIÓ EN EL PROCESO")
+            
+            self.consolidated_data = analysis
+            print(f"🎉 LLEGUÉ AL FINAL DEL ANÁLISIS - {len(analysis)} productos")
+            return analysis
+    
+        except Exception as e:
+            print(f"💥 ERROR EN EL ANÁLISIS: {str(e)}")
+            raise e
             
     def _classify_stock_status(self, row) -> str:
         """Clasifica estado del stock según curva (incluye productos sin consumo)"""
