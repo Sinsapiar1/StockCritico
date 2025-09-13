@@ -906,22 +906,66 @@ def show_curva_abc_tab(analyzer):
     show_detailed_curva_analysis(analyzer, data, selected_curva)
 
 def show_services_analysis_tab(analyzer):
-    """Tab de análisis por servicios"""
+    """Tab de análisis EXPERTO por servicios - Enfoque Stock y Criticidad"""
     
     data = analyzer.data
     
-    st.markdown("### 🍽️ Análisis por Servicios de Alimentación")
+    st.markdown("### 🍽️ Análisis Experto por Servicios - Stock vs Criticidad")
+    
+    # Debug: Mostrar información de columnas disponibles
+    st.markdown("#### 🔍 Debug - Información de Datos Procesados")
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("**📊 Columnas Disponibles:**")
+        for col in data.columns:
+            st.markdown(f"• {col}")
+    
+    with col2:
+        st.markdown("**📈 Total de Productos:**")
+        st.metric("Total", len(data))
+        
+        if 'servicio' in data.columns:
+            unique_services = data['servicio'].nunique()
+            st.metric("Servicios Únicos", unique_services)
+        else:
+            st.warning("❌ Columna 'servicio' no encontrada")
+    
+    with col3:
+        st.markdown("**🎯 Curvas Disponibles:**")
+        if 'curva' in data.columns:
+            curvas = data['curva'].value_counts()
+            for curva, count in curvas.items():
+                st.markdown(f"• Curva {curva}: {count}")
+        else:
+            st.warning("❌ Columna 'curva' no encontrada")
     
     # Verificar si hay información de servicios
     if 'servicio' not in data.columns:
-        st.warning("No hay información de servicios disponible en los datos procesados")
+        st.markdown("""
+        <div style="background: #fff3cd; padding: 1.5rem; border-radius: 8px; border-left: 4px solid #ffc107; margin: 2rem 0;">
+            <h4>🔧 Información del Procesamiento</h4>
+            <p><strong>Estado:</strong> Los servicios no se detectaron en el procesamiento actual.</p>
+            <p><strong>Causa probable:</strong> El procesador necesita ser ajustado para detectar correctamente los múltiples servicios en tu archivo.</p>
+            <p><strong>Solución:</strong> El sistema está procesando todos los datos como un solo servicio consolidado.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # Análisis consolidado cuando no hay servicios separados
+        show_consolidated_expert_analysis(analyzer, data)
         return
     
-    # Análisis por servicios
+    # Análisis por servicios (cuando están disponibles)
     services = data['servicio'].unique()
     
     if len(services) <= 1:
-        st.info("Todos los productos pertenecen al mismo servicio o no se detectaron múltiples servicios")
+        st.markdown("""
+        <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; border-left: 4px solid #2196f3;">
+            <strong>ℹ️ Un Solo Servicio Detectado:</strong> Todos los productos están consolidados en un servicio.
+        </div>
+        """, unsafe_allow_html=True)
+        show_consolidated_expert_analysis(analyzer, data)
         return
     
     st.markdown(f"""
@@ -1027,6 +1071,207 @@ def show_services_analysis_tab(analyzer):
     services_comparison = services_comparison.reset_index()
     
     st.dataframe(services_comparison, width='stretch', hide_index=True)
+
+def show_consolidated_expert_analysis(analyzer, data):
+    """Análisis EXPERTO consolidado - Enfoque Stock y Criticidad"""
+    
+    st.markdown("### 🎯 Análisis Experto Consolidado - Stock vs Criticidad")
+    
+    # 1. ANÁLISIS DE RIESGO OPERACIONAL
+    st.markdown("#### 🚨 Análisis de Riesgo Operacional")
+    
+    # Calcular métricas de riesgo
+    total_products = len(data)
+    critical_products = len(data[data['estado_stock'] == 'CRÍTICO'])
+    low_products = len(data[data['estado_stock'] == 'BAJO'])
+    risk_products = critical_products + low_products
+    
+    # Productos sin stock
+    zero_stock = len(data[data['stock'] <= 0])
+    
+    # Productos de alta rotación en riesgo (Curva A críticos)
+    high_rotation_risk = len(data[(data['curva'] == 'A') & (data['estado_stock'].isin(['CRÍTICO', 'BAJO']))])
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        risk_pct = (risk_products / total_products * 100) if total_products > 0 else 0
+        st.metric(
+            "🚨 Riesgo Total", 
+            f"{risk_pct:.1f}%",
+            delta=f"{risk_products} productos",
+            help="Productos críticos + bajos que requieren atención"
+        )
+    
+    with col2:
+        st.metric(
+            "❌ Sin Stock", 
+            zero_stock,
+            delta=f"{(zero_stock/total_products*100):.1f}%" if total_products > 0 else "0%",
+            help="Productos completamente agotados"
+        )
+    
+    with col3:
+        st.metric(
+            "🔴 Alta Rotación en Riesgo", 
+            high_rotation_risk,
+            help="Productos Curva A (alta importancia) con problemas de stock"
+        )
+    
+    with col4:
+        avg_coverage = data['dias_cobertura'].mean()
+        coverage_status = "🟢" if avg_coverage > 10 else "🟡" if avg_coverage > 5 else "🔴"
+        st.metric(
+            f"{coverage_status} Cobertura Promedio", 
+            f"{avg_coverage:.1f} días",
+            help="Días promedio hasta agotamiento según consumo actual"
+        )
+    
+    # 2. MATRIZ DE CRITICIDAD INTELIGENTE
+    st.markdown("#### 🎯 Matriz de Criticidad Inteligente")
+    
+    # Crear matriz de criticidad: Curva ABC vs Estado de Stock
+    criticality_matrix = pd.crosstab(data['curva'], data['estado_stock'], margins=True)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**📊 Matriz: Curva ABC vs Estado Stock**")
+        st.dataframe(criticality_matrix, width='stretch')
+    
+    with col2:
+        # Análisis de la matriz
+        st.markdown("**🧠 Interpretación Experta:**")
+        
+        curva_a_critical = criticality_matrix.loc['A', 'CRÍTICO'] if 'A' in criticality_matrix.index and 'CRÍTICO' in criticality_matrix.columns else 0
+        curva_b_critical = criticality_matrix.loc['B', 'CRÍTICO'] if 'B' in criticality_matrix.index and 'CRÍTICO' in criticality_matrix.columns else 0
+        curva_c_critical = criticality_matrix.loc['C', 'CRÍTICO'] if 'C' in criticality_matrix.index and 'CRÍTICO' in criticality_matrix.columns else 0
+        
+        if curva_a_critical > 0:
+            st.markdown(f"🚨 **ALERTA MÁXIMA:** {curva_a_critical} productos Curva A críticos")
+        
+        if curva_c_critical > curva_a_critical + curva_b_critical:
+            st.markdown("✅ **Patrón Normal:** Más criticidad en Curva C (bajo consumo)")
+        
+        if curva_b_critical > 0:
+            st.markdown(f"⚠️ **Atención:** {curva_b_critical} productos Curva B requieren seguimiento")
+    
+    # 3. TOP PRODUCTOS DE ALTO RIESGO
+    st.markdown("#### 🔥 Top 15 Productos de Mayor Riesgo")
+    
+    # Calcular score de riesgo
+    data_risk = data.copy()
+    
+    # Score de riesgo basado en múltiples factores
+    data_risk['risk_score'] = 0
+    
+    # Factor 1: Días de cobertura (menor = mayor riesgo)
+    data_risk['risk_score'] += (10 - data_risk['dias_cobertura']).clip(lower=0) * 2
+    
+    # Factor 2: Importancia por curva (A=alta, B=media, C=baja)
+    curva_weight = {'A': 10, 'B': 5, 'C': 1}
+    data_risk['risk_score'] += data_risk['curva'].map(curva_weight).fillna(1)
+    
+    # Factor 3: Estado crítico
+    estado_weight = {'CRÍTICO': 20, 'BAJO': 10, 'NORMAL': 2, 'ALTO': 1}
+    data_risk['risk_score'] += data_risk['estado_stock'].map(estado_weight).fillna(1)
+    
+    # Factor 4: Alto consumo
+    data_risk['risk_score'] += (data_risk['consumo_diario'] / data_risk['consumo_diario'].max() * 5).fillna(0)
+    
+    # Top productos de riesgo
+    top_risk = data_risk.nlargest(15, 'risk_score')
+    
+    st.dataframe(
+        top_risk[['codigo', 'descripcion', 'curva', 'stock', 'consumo_diario', 'dias_cobertura', 'estado_stock', 'risk_score']],
+        width='stretch',
+        hide_index=True,
+        column_config={
+            'codigo': st.column_config.TextColumn('Código', width='small'),
+            'descripcion': st.column_config.TextColumn('Descripción', width='large'),
+            'curva': st.column_config.TextColumn('Curva', width='small'),
+            'stock': st.column_config.NumberColumn('Stock', format='%.1f'),
+            'consumo_diario': st.column_config.NumberColumn('Consumo/día', format='%.2f'),
+            'dias_cobertura': st.column_config.NumberColumn('Días Cob.', format='%.1f'),
+            'estado_stock': st.column_config.TextColumn('Estado', width='small'),
+            'risk_score': st.column_config.NumberColumn('Score Riesgo', format='%.1f', help='Score calculado: días cobertura + curva + estado + consumo')
+        }
+    )
+    
+    # 4. RECOMENDACIONES INTELIGENTES
+    st.markdown("#### 💡 Recomendaciones Estratégicas")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("**🎯 Acciones Inmediatas:**")
+        
+        if curva_a_critical > 0:
+            st.markdown(f"• 🚨 **URGENTE:** Reponer {curva_a_critical} productos Curva A críticos")
+        
+        if zero_stock > 0:
+            st.markdown(f"• ❌ **CRÍTICO:** {zero_stock} productos sin stock - revisar inmediatamente")
+        
+        urgent_products = len(data[data['dias_cobertura'] <= 1])
+        if urgent_products > 0:
+            st.markdown(f"• ⏰ **HOY:** {urgent_products} productos se agotan en ≤1 día")
+        
+        very_urgent = len(data[data['dias_cobertura'] <= 3])
+        if very_urgent > 0:
+            st.markdown(f"• 📅 **Esta Semana:** {very_urgent} productos se agotan en ≤3 días")
+    
+    with col2:
+        st.markdown("**📈 Optimizaciones:**")
+        
+        # Productos con exceso de stock
+        excess_stock = len(data[data['dias_cobertura'] > 30])
+        if excess_stock > 0:
+            st.markdown(f"• 📦 **Revisar:** {excess_stock} productos con +30 días de cobertura")
+        
+        # Balance por curva
+        curva_balance = data.groupby('curva')['dias_cobertura'].mean()
+        for curva, avg_days in curva_balance.items():
+            target_days = {'A': 7, 'B': 14, 'C': 21}
+            target = target_days.get(curva, 14)
+            
+            if avg_days < target * 0.5:
+                st.markdown(f"• 🔴 **Curva {curva}:** Cobertura muy baja ({avg_days:.1f}d vs {target}d objetivo)")
+            elif avg_days > target * 2:
+                st.markdown(f"• 🟡 **Curva {curva}:** Posible sobrestock ({avg_days:.1f}d vs {target}d objetivo)")
+    
+    # 5. PROYECCIÓN DE QUIEBRES
+    st.markdown("#### 📅 Proyección de Quiebres (Próximos 7 días)")
+    
+    # Productos que se agotarán en los próximos días
+    next_days = [1, 2, 3, 7]
+    breakage_forecast = []
+    
+    for days in next_days:
+        products_breaking = len(data[data['dias_cobertura'] <= days])
+        breakage_forecast.append({
+            'Plazo': f"≤ {days} día{'s' if days > 1 else ''}",
+            'Productos': products_breaking,
+            'Porcentaje': f"{(products_breaking/total_products*100):.1f}%" if total_products > 0 else "0%"
+        })
+    
+    forecast_df = pd.DataFrame(breakage_forecast)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.dataframe(forecast_df, width='stretch', hide_index=True)
+    
+    with col2:
+        # Gráfico de proyección
+        fig_forecast = px.bar(
+            forecast_df,
+            x='Plazo',
+            y='Productos',
+            title='Productos que se Agotarán',
+            color='Productos',
+            color_continuous_scale='Reds'
+        )
+        st.plotly_chart(fig_forecast, use_container_width=True, key="breakage_forecast")
 
 def show_detailed_curva_analysis(analyzer, data, curva):
     """Análisis detallado de una curva específica"""
