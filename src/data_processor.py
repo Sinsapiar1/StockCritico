@@ -616,7 +616,7 @@ class ERPDataProcessor:
                 'unidad': 'first', 
                 'consumo': 'sum',  # SUMA de todos los servicios
                 'curva': 'first',
-                'servicio': lambda x: f"{len(x)} servicios" if len(x) > 1 else x.iloc[0]
+                'servicio': 'first'  # Tomar el primer servicio donde aparece
             }).reset_index()
             
             print(f"✅ Productos consolidados: {len(consumo_consolidado)}")

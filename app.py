@@ -917,34 +917,19 @@ def show_services_analysis_tab(analyzer):
     
     st.markdown("### 🍽️ Análisis Experto por Servicios - Stock vs Criticidad")
     
-    # Debug: Mostrar información de columnas disponibles
-    st.markdown("#### 🔍 Debug - Información de Datos Procesados")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("**📊 Columnas Disponibles:**")
-        for col in data.columns:
-            st.markdown(f"• {col}")
-    
-    with col2:
-        st.markdown("**📈 Total de Productos:**")
-        st.metric("Total", len(data))
+    # Información resumida para el usuario (sin debug técnico)
+    if 'servicio' in data.columns:
+        unique_services = data['servicio'].nunique()
+        total_products = len(data)
         
-        if 'servicio' in data.columns:
-            unique_services = data['servicio'].nunique()
-            st.metric("Servicios Únicos", unique_services)
-        else:
-            st.warning("❌ Columna 'servicio' no encontrada")
-    
-    with col3:
-        st.markdown("**🎯 Curvas Disponibles:**")
-        if 'curva' in data.columns:
-            curvas = data['curva'].value_counts()
-            for curva, count in curvas.items():
-                st.markdown(f"• Curva {curva}: {count}")
-        else:
-            st.warning("❌ Columna 'curva' no encontrada")
+        st.markdown(f"""
+        <div style="background: #e8f5e8; padding: 1rem; border-radius: 8px; border-left: 4px solid #28a745; margin-bottom: 2rem;">
+            <strong>📊 Resumen del Análisis:</strong><br>
+            • <strong>{total_products}</strong> productos analizados<br>
+            • <strong>{unique_services}</strong> servicios diferentes detectados<br>
+            • Período: <strong>8 días</strong> (01/09 - 08/09/2025)
+        </div>
+        """, unsafe_allow_html=True)
     
     # Verificar si hay información de servicios
     if 'servicio' not in data.columns:
@@ -966,20 +951,29 @@ def show_services_analysis_tab(analyzer):
         return
     
     # Análisis por servicios (cuando están disponibles)
-    services = data['servicio'].unique()
+    all_services = data['servicio'].unique()
     
-    if len(services) <= 1:
+    # Filtrar servicios reales (eliminar "X servicios")
+    real_services = [s for s in all_services if not str(s).endswith('servicios') and str(s) != 'nan']
+    
+    if len(real_services) <= 1:
         st.markdown("""
         <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; border-left: 4px solid #2196f3;">
-            <strong>ℹ️ Un Solo Servicio Detectado:</strong> Todos los productos están consolidados en un servicio.
+            <strong>ℹ️ Análisis Consolidado:</strong> Mostrando análisis consolidado de todos los servicios.
         </div>
         """, unsafe_allow_html=True)
         show_consolidated_expert_analysis(analyzer, data)
+        show_intuitive_service_breakdown(analyzer, data)
         return
     
-    st.markdown(f"""
+    services = real_services
+    
+    # Análisis directo sin mostrar información técnica confusa
+    st.markdown("#### 🍽️ Análisis por Servicios de Alimentación")
+    
+    st.markdown("""
     <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-bottom: 2rem;">
-        <strong>📋 Servicios detectados:</strong> {len(services)} servicios diferentes
+        <strong>📊 Análisis Consolidado:</strong> Productos agrupados por servicio según su consumo histórico
     </div>
     """, unsafe_allow_html=True)
     
@@ -1913,7 +1907,7 @@ def show_export_tab(analyzer, data):
                     exporter = ExcelExporter()
                     analysis_summary = analyzer.get_summary_metrics()
                     
-                    excel_file = exporter.create_professional_report(data, analysis_summary)
+                    excel_file = exporter.create_professional_report(data, analysis_summary, st.session_state.processor)
                     
                     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                     filename = f"reporte_stock_critico_{timestamp}.xlsx"
