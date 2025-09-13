@@ -665,6 +665,11 @@ def show_main_kpis(analyzer):
         <p style="color: #7f8c8d; font-size: 1.1rem;">
             Evaluación de días de cobertura basada en consumo histórico vs stock actual
         </p>
+        <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
+            <strong>🧮 Metodología de Cálculo:</strong><br>
+            <code>Consumo Diario = Consumo Total del Período ÷ 8 días (01/09 - 08/09/2025)</code><br>
+            <code>Días de Cobertura = Stock Actual ÷ Consumo Promedio Diario</code>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     

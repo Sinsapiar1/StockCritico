@@ -175,6 +175,17 @@ class ERPDataProcessor:
         except:
             return ("01/09/2025", "08/09/2025")
     
+    def _calculate_period_days(self, start_date: str, end_date: str) -> int:
+        """Calcula días del período de análisis"""
+        try:
+            from datetime import datetime
+            start = datetime.strptime(start_date, '%d/%m/%Y')
+            end = datetime.strptime(end_date, '%d/%m/%Y')
+            days = (end - start).days + 1  # +1 para incluir ambos días
+            return days if days > 0 else 8  # Default 8 días
+        except:
+            return 8  # Default
+    
     def _is_product_row(self, row: pd.Series) -> bool:
         """Detecta si es fila de producto (primera celda es número)"""
         try:
@@ -560,28 +571,46 @@ class ERPDataProcessor:
     
     def calculate_coverage_analysis(self, days_period: int = 8) -> pd.DataFrame:
         """
-        Calcula análisis de cobertura combinando datos
+        Calcula análisis de cobertura EXPERTO combinando datos ABC y Stock
+        
+        METODOLOGÍA:
+        1. Consolida consumo total por producto (suma todos los servicios)
+        2. Calcula consumo promedio diario = Consumo Total ÷ Días del Período
+        3. Calcula días de cobertura = Stock Actual ÷ Consumo Promedio Diario
+        4. Clasifica criticidad según curva ABC y días de cobertura
         """
         try:
             if self.curva_abc_data is None or self.stock_data is None:
                 raise Exception("Debe procesar ambos archivos primero")
             
-            print(f"Calculando análisis con {len(self.curva_abc_data)} productos ABC y {len(self.stock_data)} productos stock")
+            print(f"\n=== ANÁLISIS EXPERTO DE COBERTURA ===")
+            print(f"📊 Productos Curva ABC: {len(self.curva_abc_data)}")
+            print(f"📦 Productos Stock: {len(self.stock_data)}")
+            print(f"📅 Período de análisis: {days_period} días")
             
             # Consolidar consumo por código (sumar todos los servicios)
+            print(f"\n🔄 Consolidando consumo por producto...")
             consumo_consolidado = self.curva_abc_data.groupby('codigo').agg({
                 'descripcion': 'first',
                 'unidad': 'first', 
-                'consumo': 'sum',
-                'curva': 'first'
+                'consumo': 'sum',  # SUMA de todos los servicios
+                'curva': 'first',
+                'servicio': lambda x: f"{len(x)} servicios" if len(x) > 1 else x.iloc[0]
             }).reset_index()
             
-            print(f"Productos consolidados: {len(consumo_consolidado)}")
+            print(f"✅ Productos consolidados: {len(consumo_consolidado)}")
             
-            # Calcular consumo promedio diario
+            # Calcular consumo promedio diario EXPERTO
+            print(f"🧮 Calculando consumo promedio diario...")
             consumo_consolidado['consumo_diario'] = consumo_consolidado['consumo'] / days_period
             
+            # Mostrar ejemplos del cálculo
+            top_consumers = consumo_consolidado.nlargest(3, 'consumo')
+            for _, product in top_consumers.iterrows():
+                print(f"   📈 {product['codigo']}: {product['consumo']:.1f} total ÷ {days_period} días = {product['consumo_diario']:.2f}/día")
+            
             # Hacer merge con stock (inner join para tener solo productos que están en ambos)
+            print(f"\n🔗 Cruzando datos ABC con Stock...")
             analysis = pd.merge(
                 consumo_consolidado,
                 self.stock_data[['codigo', 'stock', 'familia']],
@@ -589,16 +618,31 @@ class ERPDataProcessor:
                 how='inner'
             )
             
-            print(f"Productos después del merge: {len(analysis)}")
+            print(f"✅ Productos después del merge: {len(analysis)}")
             
             if len(analysis) == 0:
                 raise Exception("No hay productos en común entre Curva ABC y Stock. Verificar códigos de productos.")
             
-            # Calcular días de cobertura
+            # Calcular días de cobertura EXPERTO
+            print(f"\n⏱️  Calculando días de cobertura...")
             analysis['dias_cobertura'] = analysis.apply(
                 lambda row: row['stock'] / row['consumo_diario'] 
                 if row['consumo_diario'] > 0 else 999, axis=1
             )
+            
+            # Mostrar ejemplos del cálculo de cobertura
+            sample_products = analysis.head(3)
+            for _, product in sample_products.iterrows():
+                if product['consumo_diario'] > 0:
+                    print(f"   ⏰ {product['codigo']}: {product['stock']:.1f} stock ÷ {product['consumo_diario']:.2f}/día = {product['dias_cobertura']:.1f} días")
+            
+            # Estadísticas del análisis
+            print(f"\n📊 ESTADÍSTICAS DEL ANÁLISIS:")
+            print(f"   • Cobertura promedio: {analysis['dias_cobertura'].mean():.1f} días")
+            print(f"   • Cobertura mínima: {analysis['dias_cobertura'].min():.1f} días")
+            print(f"   • Cobertura máxima: {analysis['dias_cobertura'].max():.1f} días")
+            print(f"   • Productos con <3 días: {len(analysis[analysis['dias_cobertura'] < 3])}")
+            print(f"   • Productos con <7 días: {len(analysis[analysis['dias_cobertura'] < 7])}")
             
             # Clasificar estado según curva ABC
             analysis['estado_stock'] = analysis.apply(self._classify_stock_status, axis=1)
