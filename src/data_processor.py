@@ -43,10 +43,10 @@ class ERPDataProcessor:
                     # Detectar servicios y curvas
                     row_str = ' '.join([str(cell) for cell in row if pd.notna(cell)])
                     
-                    # Detectar servicio
-                    if "Servicio" in row_str and ":" in row_str:
+                    # Detectar servicio (múltiples patrones)
+                    if ("Servicio" in row_str and ":" in row_str) or ("10000" in row_str and "Desayuno" in row_str) or ("10001" in row_str and "Almuerzo" in row_str) or ("10003" in row_str and "Cena" in row_str):
                         current_service = self._extract_service_name(row_str)
-                        print(f"Servicio detectado: {current_service}")
+                        print(f"🍽️ Servicio detectado: {current_service}")
                         continue
                     
                     # Detectar curva ABC
@@ -145,9 +145,26 @@ class ERPDataProcessor:
             raise Exception(f"Error procesando Curva ABC: {str(e)}")
     
     def _extract_service_name(self, text: str) -> str:
-        """Extrae nombre del servicio de forma simple"""
+        """Extrae nombre del servicio de forma inteligente"""
         try:
-            if "Desayuno" in text:
+            # Patrones específicos de servicios
+            if "10000" in text and "Desayuno" in text:
+                return "Desayuno"
+            elif "10001" in text and "Almuerzo" in text:
+                return "Almuerzo"
+            elif "10003" in text and "Cena" in text:
+                return "Cena"
+            elif "10007" in text and "Nochera" in text:
+                return "Cena Nochera"
+            elif "10008" in text and "Colacion" in text:
+                return "Colación Reemplazo"
+            elif "10066" in text and "Gimnasio" in text:
+                return "Choca Gimnasio"
+            elif "10948" in text and "Bajada" in text:
+                return "Colación Bajada"
+            elif "11198" in text and "Satelital" in text:
+                return "Almuerzo Satelital"
+            elif "Desayuno" in text:
                 return "Desayuno"
             elif "Almuerzo" in text:
                 return "Almuerzo"
@@ -159,10 +176,14 @@ class ERPDataProcessor:
                 # Extraer texto después de ":"
                 parts = text.split(":")
                 if len(parts) > 1:
-                    return parts[1].strip()[:50]  # Primeros 50 caracteres
-                return "Servicio"
+                    service_name = parts[1].strip()
+                    # Limpiar números y caracteres especiales
+                    import re
+                    clean_name = re.sub(r'^\d+\s*-\s*', '', service_name)
+                    return clean_name[:30]  # Primeros 30 caracteres
+                return "Servicio General"
         except:
-            return "Servicio"
+            return "Servicio General"
     
     def _extract_dates(self, text: str) -> Tuple[str, str]:
         """Extrae fechas de forma robusta"""

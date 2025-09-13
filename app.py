@@ -959,6 +959,10 @@ def show_services_analysis_tab(analyzer):
         
         # Análisis consolidado cuando no hay servicios separados
         show_consolidated_expert_analysis(analyzer, data)
+        
+        # ANÁLISIS INTUITIVO POR SERVICIOS (Simulado basado en datos)
+        st.markdown("---")
+        show_intuitive_service_breakdown(analyzer, data)
         return
     
     # Análisis por servicios (cuando están disponibles)
@@ -1277,6 +1281,145 @@ def show_consolidated_expert_analysis(analyzer, data):
             color_continuous_scale='Reds'
         )
         st.plotly_chart(fig_forecast, use_container_width=True, key="breakage_forecast")
+
+def show_intuitive_service_breakdown(analyzer, data):
+    """Análisis intuitivo por servicios con explicaciones claras"""
+    
+    st.markdown("### 🍽️ Análisis Intuitivo por Tipo de Servicio")
+    
+    st.markdown("""
+    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 2rem;">
+        <h4 style="color: #2c3e50;">💡 ¿Cómo funciona este análisis?</h4>
+        <p><strong>1. Datos de Consumo:</strong> Tomamos el consumo de cada producto durante 8 días (01/09 - 08/09/2025)</p>
+        <p><strong>2. Consumo Diario:</strong> Dividimos el consumo total ÷ 8 días = consumo promedio por día</p>
+        <p><strong>3. Stock Actual:</strong> Comparamos con el inventario actual que tienes</p>
+        <p><strong>4. Días de Cobertura:</strong> Stock actual ÷ consumo diario = cuántos días te durará</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Análisis por categorías de productos (simulando servicios)
+    st.markdown("#### 🔍 Análisis por Categorías de Productos")
+    
+    # Categorizar productos por tipo
+    data_categorized = data.copy()
+    
+    def categorize_product(description):
+        desc = str(description).upper()
+        if any(word in desc for word in ['HUEVO', 'PAN', 'LECHE', 'YOGURT', 'MANTEQUILLA', 'CAFE', 'TE']):
+            return 'Desayuno'
+        elif any(word in desc for word in ['EMPANADA', 'POLLO', 'CARNE', 'ARROZ', 'PAPA', 'VERDURA']):
+            return 'Almuerzo/Cena'
+        elif any(word in desc for word in ['GALLETA', 'CHOCOLATE', 'GASEOSA', 'AGUA', 'JUGO']):
+            return 'Colaciones'
+        elif any(word in desc for word in ['POSTRE', 'HELADO', 'FLAN', 'DULCE']):
+            return 'Postres'
+        else:
+            return 'Otros'
+    
+    data_categorized['categoria_servicio'] = data_categorized['descripcion'].apply(categorize_product)
+    
+    # Análisis por categoría
+    category_analysis = data_categorized.groupby('categoria_servicio').agg({
+        'codigo': 'count',
+        'stock': 'sum',
+        'consumo_diario': 'sum',
+        'dias_cobertura': 'mean',
+        'estado_stock': lambda x: (x == 'CRÍTICO').sum()
+    }).round(2)
+    
+    category_analysis.columns = ['Total Productos', 'Stock Total', 'Consumo Diario Total', 'Cobertura Promedio', 'Productos Críticos']
+    category_analysis = category_analysis.reset_index()
+    category_analysis.columns = ['Categoría', 'Total Productos', 'Stock Total', 'Consumo Diario Total', 'Cobertura Promedio', 'Productos Críticos']
+    
+    st.markdown("**📊 Resumen por Categoría de Productos:**")
+    st.dataframe(category_analysis, width='stretch', hide_index=True)
+    
+    # Explicación de cada categoría
+    st.markdown("#### 💡 Explicación de Cálculos por Categoría")
+    
+    for _, category in category_analysis.iterrows():
+        cat_name = category['Categoría']
+        total_products = int(category['Total Productos'])
+        stock_total = category['Stock Total']
+        consumo_total = category['Consumo Diario Total']
+        cobertura_prom = category['Cobertura Promedio']
+        criticos = int(category['Productos Críticos'])
+        
+        with st.expander(f"🔍 {cat_name} - {total_products} productos", expanded=(criticos > 0)):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**📊 Datos Actuales:**")
+                st.markdown(f"• **Stock Total**: {stock_total:,.1f} unidades")
+                st.markdown(f"• **Consumo Diario**: {consumo_total:,.1f} unidades/día")
+                st.markdown(f"• **Cobertura Promedio**: {cobertura_prom:.1f} días")
+                st.markdown(f"• **Productos Críticos**: {criticos}")
+            
+            with col2:
+                st.markdown("**🧮 Cómo se Calculó:**")
+                st.markdown(f"1. **Período**: 8 días (01/09 - 08/09/2025)")
+                st.markdown(f"2. **Consumo Diario**: Consumo total ÷ 8 días")
+                st.markdown(f"3. **Cobertura**: Stock actual ÷ consumo diario")
+                st.markdown(f"4. **Crítico**: Si cobertura < umbral por curva ABC")
+            
+            # Mostrar productos críticos de esta categoría
+            cat_data = data_categorized[data_categorized['categoria_servicio'] == cat_name]
+            cat_critical = cat_data[cat_data['estado_stock'] == 'CRÍTICO']
+            
+            if len(cat_critical) > 0:
+                st.markdown(f"**🚨 Productos Críticos en {cat_name}:**")
+                st.dataframe(
+                    cat_critical[['codigo', 'descripcion', 'stock', 'consumo_diario', 'dias_cobertura']].head(5),
+                    width='stretch',
+                    hide_index=True,
+                    column_config={
+                        'codigo': st.column_config.TextColumn('Código', width='small'),
+                        'descripcion': st.column_config.TextColumn('Descripción', width='large'),
+                        'stock': st.column_config.NumberColumn('Stock Actual', format='%.1f'),
+                        'consumo_diario': st.column_config.NumberColumn('Consumo/día', format='%.2f'),
+                        'dias_cobertura': st.column_config.NumberColumn('Días Cobertura', format='%.1f')
+                    }
+                )
+                
+                # Explicación específica para productos críticos
+                st.markdown(f"""
+                <div style="background: #fff3cd; padding: 1rem; border-radius: 8px; border-left: 4px solid #ffc107;">
+                    <strong>🧠 Interpretación:</strong> Estos productos de {cat_name} se agotarán pronto porque 
+                    su consumo diario es alto comparado con el stock actual disponible.
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # Gráfico comparativo por categoría
+    st.markdown("#### 📈 Comparación Visual por Categorías")
+    
+    fig_categories = px.scatter(
+        category_analysis,
+        x='Consumo Diario Total',
+        y='Cobertura Promedio', 
+        size='Total Productos',
+        color='Productos Críticos',
+        hover_name='Categoría',
+        title='Consumo vs Cobertura por Categoría',
+        labels={
+            'Consumo Diario Total': 'Consumo Diario Total (unidades/día)',
+            'Cobertura Promedio': 'Días de Cobertura Promedio',
+            'Productos Críticos': 'Productos Críticos'
+        },
+        color_continuous_scale='Reds'
+    )
+    
+    st.plotly_chart(fig_categories, use_container_width=True, key="categories_analysis")
+    
+    # Explicación del gráfico
+    st.markdown("""
+    <div style="background: #e8f5e8; padding: 1rem; border-radius: 8px; border-left: 4px solid #28a745;">
+        <strong>📊 Cómo leer el gráfico:</strong><br>
+        • <strong>Eje X (Consumo Diario):</strong> Cuánto se consume por día de esa categoría<br>
+        • <strong>Eje Y (Cobertura):</strong> Cuántos días dura el stock actual<br>
+        • <strong>Tamaño del círculo:</strong> Cantidad de productos en esa categoría<br>
+        • <strong>Color rojo:</strong> Más productos críticos en esa categoría
+    </div>
+    """, unsafe_allow_html=True)
 
 def show_detailed_curva_analysis(analyzer, data, curva):
     """Análisis detallado de una curva específica"""
