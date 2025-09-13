@@ -224,11 +224,16 @@ class ExcelExporter:
         ws = writer.book.add_worksheet('Stock Actual Completo')
         
         ws.merge_range('A1:H1', 'STOCK ACTUAL COMPLETO - ANÁLISIS DE COBERTURA', self.formats['title'])
-        ws.merge_range('A2:H2', f'Generado el: {datetime.now().strftime("%d/%m/%Y %H:%M")} | Período: 01/09-08/09/2025 (8 días)', self.formats['border'])
+        # Obtener fechas dinámicas del procesador
+        period_start = processor.analysis_period_start if processor else "01/09/2025"
+        period_end = processor.analysis_period_end if processor else "08/09/2025"
+        period_days = processor.analysis_days if processor else 8
+        
+        ws.merge_range('A2:H2', f'Generado el: {datetime.now().strftime("%d/%m/%Y %H:%M")} | Período: {period_start}-{period_end} ({period_days} días)', self.formats['border'])
         
         # Explicación de metodología
         ws.merge_range('A4:H4', 'METODOLOGÍA DE CÁLCULO', self.formats['header'])
-        ws.write('A5', '1. Consumo Diario = Consumo Total del Período ÷ 8 días', self.formats['border'])
+        ws.write('A5', f'1. Consumo Diario = Consumo Total del Período ÷ {period_days} días', self.formats['border'])
         ws.write('A6', '2. Días de Cobertura = Stock Actual ÷ Consumo Diario', self.formats['border'])
         ws.write('A7', '3. Estado = Crítico si cobertura < umbral por Curva ABC', self.formats['border'])
         ws.write('A8', '4. SIN CONSUMO = Productos no consumidos en el período analizado', self.formats['border'])
@@ -250,9 +255,9 @@ class ExcelExporter:
             curva = row['curva']
             
             if consumo_diario > 0:
-                observacion = f"Período: 01/09-08/09/2025 (8 días). Consumo: {consumo_diario:.2f}/día"
+                observacion = f"Período: {period_start}-{period_end} ({period_days} días). Consumo: {consumo_diario:.2f}/día"
             else:
-                observacion = f"Producto en inventario pero NO consumido en período 01/09-08/09/2025"
+                observacion = f"Producto en inventario pero NO consumido en período {period_start}-{period_end}"
             
             stock_analysis.append([
                 codigo,

@@ -513,7 +513,7 @@ def show_processing():
             # Procesar archivos
             curva_abc_data = processor.process_curva_abc(st.session_state.curva_abc_file)
             stock_data = processor.process_stock(st.session_state.stock_file)
-            analysis_data = processor.calculate_coverage_analysis(8)  # Default 8 días
+            analysis_data = processor.calculate_coverage_analysis(processor.analysis_days)  # Usar días detectados automáticamente
             
             # Guardar en session state
             st.session_state.analysis_data = analysis_data
@@ -682,7 +682,7 @@ def show_main_kpis(analyzer):
         </p>
         <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
             <strong>🧮 Metodología de Cálculo:</strong><br>
-            <code>Consumo Diario = Consumo Total del Período ÷ 8 días (01/09 - 08/09/2025)</code><br>
+            <code>Consumo Diario = Consumo Total del Período ÷ {st.session_state.processor.analysis_days if 'processor' in st.session_state else 8} días ({st.session_state.processor.analysis_period_start if 'processor' in st.session_state else '01/09/2025'} - {st.session_state.processor.analysis_period_end if 'processor' in st.session_state else '08/09/2025'})</code><br>
             <code>Días de Cobertura = Stock Actual ÷ Consumo Promedio Diario</code>
         </div>
     </div>
@@ -947,7 +947,7 @@ def show_services_analysis_tab(analyzer):
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div>
                 <strong>📦 Stock Total:</strong> {total_products} productos<br>
-                <strong>📅 Período:</strong> 8 días (01/09 - 08/09/2025)<br>
+                <strong>📅 Período:</strong> {st.session_state.processor.analysis_days if 'processor' in st.session_state else 8} días ({st.session_state.processor.analysis_period_start if 'processor' in st.session_state else '01/09/2025'} - {st.session_state.processor.analysis_period_end if 'processor' in st.session_state else '08/09/2025'})<br>
                 <strong>🍽️ Servicios:</strong> {unique_services} detectados
             </div>
             <div>

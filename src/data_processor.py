@@ -8,6 +8,9 @@ class ERPDataProcessor:
         self.curva_abc_data = None
         self.stock_data = None
         self.consolidated_data = None
+        self.analysis_period_start = None
+        self.analysis_period_end = None
+        self.analysis_days = 8  # Default
     
     def process_curva_abc(self, file_path: str) -> pd.DataFrame:
         """
@@ -32,6 +35,9 @@ class ERPDataProcessor:
                 if row_values:
                     print(f"F{i:2d}: {' | '.join(row_values)}")
             print("=== FIN MUESTRA ===\n")
+            
+            # Extraer fechas del archivo automáticamente
+            self._extract_analysis_period(df)
             
             # Búsqueda inteligente de productos con detección de servicios y curvas
             consolidated_data = []
@@ -196,6 +202,38 @@ class ERPDataProcessor:
         except:
             return ("01/09/2025", "08/09/2025")
     
+    def _extract_analysis_period(self, df: pd.DataFrame):
+        """Extrae automáticamente el período de análisis del archivo"""
+        try:
+            print("\n📅 Extrayendo período de análisis del archivo...")
+            
+            # Buscar fechas en las primeras 20 filas
+            for idx, row in df.head(20).iterrows():
+                row_str = ' '.join([str(cell) for cell in row if pd.notna(cell)])
+                
+                if "Rango" in row_str and "Facha" in row_str:
+                    dates = re.findall(r'\d{2}/\d{2}/\d{4}', row_str)
+                    if len(dates) >= 2:
+                        self.analysis_period_start = dates[0]
+                        self.analysis_period_end = dates[1]
+                        self.analysis_days = self._calculate_period_days(dates[0], dates[1])
+                        
+                        print(f"✅ Período detectado: {self.analysis_period_start} - {self.analysis_period_end}")
+                        print(f"✅ Días de análisis: {self.analysis_days}")
+                        return
+            
+            # Si no encuentra fechas, usar defaults
+            self.analysis_period_start = "01/09/2025"
+            self.analysis_period_end = "08/09/2025"
+            self.analysis_days = 8
+            print(f"⚠️ Fechas no detectadas, usando default: {self.analysis_period_start} - {self.analysis_period_end}")
+            
+        except Exception as e:
+            print(f"Error extrayendo fechas: {e}")
+            self.analysis_period_start = "01/09/2025"
+            self.analysis_period_end = "08/09/2025" 
+            self.analysis_days = 8
+
     def _calculate_period_days(self, start_date: str, end_date: str) -> int:
         """Calcula días del período de análisis"""
         try:
