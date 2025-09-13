@@ -708,9 +708,23 @@ class ERPDataProcessor:
             productos_sin_consumo = len(analysis[analysis['consumo_diario'] == 0])
             
             print(f"\n📊 ESTADÍSTICAS COMPLETAS DEL ANÁLISIS:")
-            print(f"   • Total productos en stock: {len(analysis)}")
+            print(f"   • Total productos en stock original: {len(self.stock_data)}")
+            print(f"   • Total productos en análisis final: {len(analysis)}")
             print(f"   • Con consumo en período: {productos_con_consumo}")
             print(f"   • Sin consumo en período: {productos_sin_consumo}")
+            
+            # Debug: verificar productos faltantes
+            if len(analysis) < len(self.stock_data):
+                missing_count = len(self.stock_data) - len(analysis)
+                print(f"   ⚠️ ATENCIÓN: {missing_count} productos del stock no aparecen en análisis")
+                
+                # Encontrar productos faltantes
+                stock_codes = set(self.stock_data['codigo'].astype(str))
+                analysis_codes = set(analysis['codigo'].astype(str))
+                missing_codes = stock_codes - analysis_codes
+                
+                if missing_codes:
+                    print(f"   📋 Productos faltantes: {list(missing_codes)[:5]}...")  # Mostrar primeros 5
             
             # Estadísticas solo para productos con consumo
             analysis_with_consumption = analysis[analysis['consumo_diario'] > 0]

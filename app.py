@@ -680,11 +680,25 @@ def show_main_kpis(analyzer):
         <p style="color: #7f8c8d; font-size: 1.1rem;">
             Evaluación de días de cobertura basada en consumo histórico vs stock actual
         </p>
-        <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin-top: 1rem;">
-            <strong>🧮 Metodología de Cálculo:</strong><br>
-            <code>Consumo Diario = Consumo Total del Período ÷ {st.session_state.processor.analysis_days if 'processor' in st.session_state else 8} días ({st.session_state.processor.analysis_period_start if 'processor' in st.session_state else '01/09/2025'} - {st.session_state.processor.analysis_period_end if 'processor' in st.session_state else '08/09/2025'})</code><br>
-            <code>Días de Cobertura = Stock Actual ÷ Consumo Promedio Diario</code>
-        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Mostrar metodología de cálculo dinámicamente
+    if 'processor' in st.session_state and st.session_state.processor:
+        proc = st.session_state.processor
+        period_start = proc.analysis_period_start
+        period_end = proc.analysis_period_end
+        period_days = proc.analysis_days
+    else:
+        period_start = "01/09/2025"
+        period_end = "08/09/2025"
+        period_days = 8
+    
+    st.markdown(f"""
+    <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin-bottom: 2rem;">
+        <strong>🧮 Metodología de Cálculo:</strong><br>
+        <code>Consumo Diario = Consumo Total del Período ÷ {period_days} días ({period_start} - {period_end})</code><br>
+        <code>Días de Cobertura = Stock Actual ÷ Consumo Promedio Diario</code>
     </div>
     """, unsafe_allow_html=True)
     
@@ -937,6 +951,17 @@ def show_services_analysis_tab(analyzer):
         unique_services = data['servicio'].nunique()
         total_products = len(data)
         
+    # Obtener fechas dinámicas
+    if 'processor' in st.session_state and st.session_state.processor:
+        proc = st.session_state.processor
+        period_start = proc.analysis_period_start
+        period_end = proc.analysis_period_end
+        period_days = proc.analysis_days
+    else:
+        period_start = "01/09/2025"
+        period_end = "08/09/2025"
+        period_days = 8
+    
     # Calcular estadísticas para mostrar
     productos_con_consumo = len(data[data['consumo_diario'] > 0])
     productos_sin_consumo = len(data[data['consumo_diario'] == 0])
@@ -947,7 +972,7 @@ def show_services_analysis_tab(analyzer):
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
             <div>
                 <strong>📦 Stock Total:</strong> {total_products} productos<br>
-                <strong>📅 Período:</strong> {st.session_state.processor.analysis_days if 'processor' in st.session_state else 8} días ({st.session_state.processor.analysis_period_start if 'processor' in st.session_state else '01/09/2025'} - {st.session_state.processor.analysis_period_end if 'processor' in st.session_state else '08/09/2025'})<br>
+                <strong>📅 Período:</strong> {period_days} días ({period_start} - {period_end})<br>
                 <strong>🍽️ Servicios:</strong> {unique_services} detectados
             </div>
             <div>
@@ -1307,13 +1332,24 @@ def show_consolidated_expert_analysis(analyzer, data):
 def show_intuitive_service_breakdown(analyzer, data):
     """Análisis intuitivo por servicios con explicaciones claras"""
     
+    # Obtener fechas dinámicas
+    if 'processor' in st.session_state and st.session_state.processor:
+        proc = st.session_state.processor
+        period_start = proc.analysis_period_start
+        period_end = proc.analysis_period_end
+        period_days = proc.analysis_days
+    else:
+        period_start = "01/09/2025"
+        period_end = "08/09/2025"
+        period_days = 8
+    
     st.markdown("### 🍽️ Análisis Intuitivo por Tipo de Servicio")
     
-    st.markdown("""
+    st.markdown(f"""
     <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 10px; margin-bottom: 2rem;">
         <h4 style="color: #2c3e50;">💡 ¿Cómo funciona este análisis?</h4>
-        <p><strong>1. Datos de Consumo:</strong> Tomamos el consumo de cada producto durante 8 días (01/09 - 08/09/2025)</p>
-        <p><strong>2. Consumo Diario:</strong> Dividimos el consumo total ÷ 8 días = consumo promedio por día</p>
+        <p><strong>1. Datos de Consumo:</strong> Tomamos el consumo de cada producto durante {period_days} días ({period_start} - {period_end})</p>
+        <p><strong>2. Consumo Diario:</strong> Dividimos el consumo total ÷ {period_days} días = consumo promedio por día</p>
         <p><strong>3. Stock Actual:</strong> Comparamos con el inventario actual que tienes</p>
         <p><strong>4. Días de Cobertura:</strong> Stock actual ÷ consumo diario = cuántos días te durará</p>
     </div>
@@ -1379,8 +1415,8 @@ def show_intuitive_service_breakdown(analyzer, data):
             
             with col2:
                 st.markdown("**🧮 Cómo se Calculó:**")
-                st.markdown(f"1. **Período**: 8 días (01/09 - 08/09/2025)")
-                st.markdown(f"2. **Consumo Diario**: Consumo total ÷ 8 días")
+                st.markdown(f"1. **Período**: {period_days} días ({period_start} - {period_end})")
+                st.markdown(f"2. **Consumo Diario**: Consumo total ÷ {period_days} días")
                 st.markdown(f"3. **Cobertura**: Stock actual ÷ consumo diario")
                 st.markdown(f"4. **Crítico**: Si cobertura < umbral por curva ABC")
             
