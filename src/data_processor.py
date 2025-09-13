@@ -381,7 +381,7 @@ class ERPDataProcessor:
     
     def process_stock(self, file_path: str) -> pd.DataFrame:
         """
-        Procesa el archivo de stock usando el mismo enfoque exitoso que ABC
+        Procesa el archivo de stock con debugging específico para productos problema
         """
         try:
             print("Iniciando procesamiento de Stock...")
@@ -421,16 +421,23 @@ class ERPDataProcessor:
             
             for idx, row in df.iterrows():
                 try:
-                    # Detectar familia (igual que antes)
+                    # DEBUG ESPECÍFICO para productos problema 453 y 641
                     row_str = ' '.join([str(cell) for cell in row if pd.notna(cell)])
+                    if any(code in row_str for code in ['453', '641']):
+                        print(f"\n🔍 DEBUG STOCK FILA {idx} - PRODUCTO PROBLEMA:")
+                        print(f"   Fila completa: {row_str}")
+                        for col_idx, cell in enumerate(row):
+                            if pd.notna(cell):
+                                print(f"   Col{col_idx}: '{cell}'")
                     
+                    # Detectar familia (igual que antes)
                     if self._is_family_header(row_str):
                         current_family = self._extract_family_name(row_str)
                         print(f"Familia detectada: {current_family}")
                         continue
                     
-                    # Buscar productos usando enfoque similar a ABC
-                    for col_idx in range(min(4, len(row))):
+                    # Buscar productos usando enfoque similar a ABC pero MÁS FLEXIBLE
+                    for col_idx in range(min(6, len(row))):  # Aumentado a 6 columnas
                         cell = row.iloc[col_idx]
                         if pd.isna(cell):
                             continue
@@ -442,7 +449,7 @@ class ERPDataProcessor:
                             code = int(float(cell_str))
                             if 1 <= code <= 999999:  # Rango válido de códigos
                                 
-                                # Buscar descripción, unidad y stock
+                                # Buscar descripción, unidad y stock con criterios MÁS FLEXIBLES
                                 description = "Sin descripción"
                                 unit = "Und"
                                 stock_value = 0
@@ -456,12 +463,15 @@ class ERPDataProcessor:
                                     
                                     search_str = str(search_cell).strip()
                                     
-                                    # Si es texto largo, probablemente es descripción
+                                    # CRITERIO MÁS FLEXIBLE para descripción - PERMITE "LIMON" (5 caracteres)
                                     if (description == "Sin descripción" and 
-                                        len(search_str) > 5 and 
+                                        len(search_str) >= 3 and  # REDUCIDO de >5 a >=3 para "LIMON"
                                         not search_str.replace('.', '').replace(',', '').replace('-', '').isdigit() and
                                         "Total" not in search_str):
                                         description = search_str
+                                        # DEBUG específico para productos problema
+                                        if code in [453, 641]:
+                                            print(f"   ✅ DESCRIPCIÓN ENCONTRADA: '{description}'")
                                         continue
                                     
                                     # Si es texto corto, puede ser unidad
@@ -476,6 +486,9 @@ class ERPDataProcessor:
                                         numeric_val = float(search_str.replace(',', '.'))
                                         if stock_value == 0:
                                             stock_value = numeric_val
+                                            # DEBUG específico para productos problema
+                                            if code in [453, 641]:
+                                                print(f"   ✅ STOCK ENCONTRADO: {stock_value}")
                                         elif price == 0:
                                             price = numeric_val
                                         elif total == 0:
@@ -483,8 +496,16 @@ class ERPDataProcessor:
                                     except:
                                         continue
                                 
-                                # Si encontramos código + descripción válida
-                                if description != "Sin descripción":
+                                # VALIDACIÓN MÁS FLEXIBLE - Si encontramos código + descripción válida
+                                if description != "Sin descripción" or len(str(search_str).strip()) >= 3:
+                                    # DEBUG específico antes de agregar
+                                    if code in [453, 641]:
+                                        print(f"   🎯 VALIDANDO PRODUCTO {code}:")
+                                        print(f"      Código: {code}")
+                                        print(f"      Descripción: '{description}'")
+                                        print(f"      Stock: {stock_value}")
+                                        print(f"      ¿Se agregará?: SÍ")
+                                    
                                     product_data = [
                                         str(code), description, unit, stock_value, 
                                         price, total, current_family
@@ -492,14 +513,29 @@ class ERPDataProcessor:
                                     stock_data.append(product_data)
                                     print(f"✓ STOCK: {code} - {description[:30]} - Stock: {stock_value}")
                                     break  # No buscar más en esta fila
+                                else:
+                                    # DEBUG específico para productos problema que no pasan validación
+                                    if code in [453, 641]:
+                                        print(f"   ❌ PRODUCTO {code} NO PASÓ VALIDACIÓN:")
+                                        print(f"      Descripción encontrada: '{description}'")
+                                        print(f"      Longitud descripción: {len(description)}")
                         
                         except ValueError:
                             continue
                 
                 except Exception as e:
+                    # DEBUG específico para errores en productos problema
+                    if any(code in str(row.values) for code in ['453', '641']):
+                        print(f"   💥 ERROR procesando fila con productos problema: {str(e)}")
                     continue
             
             print(f"\nProductos de stock encontrados: {len(stock_data)}")
+            
+            # DEBUG FINAL: Verificar si se encontraron los productos problema
+            print(f"\n🔍 VERIFICACIÓN FINAL - ¿Se encontraron los productos problema?")
+            for code in ['453', '641']:
+                found = any(product[0] == str(code) for product in stock_data)
+                print(f"   Producto {code}: {'✅ ENCONTRADO' if found else '❌ NO ENCONTRADO'}")
             
             if stock_data:
                 columns = ['codigo', 'descripcion', 'unidad', 'stock', 'precio', 'total', 'familia']
@@ -507,6 +543,16 @@ class ERPDataProcessor:
                 result_df = self._clean_stock_dataframe(result_df)
                 
                 print(f"DataFrame stock final: {len(result_df)} productos")
+                
+                # DEBUG FINAL en DataFrame: Verificar productos problema
+                print(f"\n🔍 VERIFICACIÓN EN DATAFRAME FINAL:")
+                for code in ['453', '641']:
+                    if str(code) in result_df['codigo'].values:
+                        row = result_df[result_df['codigo'] == str(code)].iloc[0]
+                        print(f"   ✅ {code} en DataFrame: {row['descripcion']} - Stock: {row['stock']}")
+                    else:
+                        print(f"   ❌ {code} NO está en DataFrame final")
+                
                 self.stock_data = result_df
                 return result_df
             else:
