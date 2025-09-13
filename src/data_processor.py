@@ -33,13 +33,36 @@ class ERPDataProcessor:
                     print(f"F{i:2d}: {' | '.join(row_values)}")
             print("=== FIN MUESTRA ===\n")
             
-            # Búsqueda simple de productos
+            # Búsqueda inteligente de productos con detección de servicios y curvas
             consolidated_data = []
             current_service = "Servicio General"
             current_curva = "C"  # Default
             
             for idx, row in df.iterrows():
                 try:
+                    # Detectar servicios y curvas
+                    row_str = ' '.join([str(cell) for cell in row if pd.notna(cell)])
+                    
+                    # Detectar servicio
+                    if "Servicio" in row_str and ":" in row_str:
+                        current_service = self._extract_service_name(row_str)
+                        print(f"Servicio detectado: {current_service}")
+                        continue
+                    
+                    # Detectar curva ABC
+                    if "Curva A" in row_str:
+                        current_curva = "A"
+                        print(f"Curva A detectada")
+                        continue
+                    elif "Curva B" in row_str:
+                        current_curva = "B"
+                        print(f"Curva B detectada")
+                        continue
+                    elif "Curva C" in row_str:
+                        current_curva = "C"
+                        print(f"Curva C detectada")
+                        continue
+                    
                     # Buscar códigos de producto en cualquier columna
                     for col_idx in range(min(4, len(row))):
                         cell = row.iloc[col_idx]

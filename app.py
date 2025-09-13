@@ -605,9 +605,10 @@ def show_results():
     show_main_kpis(analyzer)
     
     # Tabs con análisis detallado
-    tab1, tab2, tab3, tab4 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
         "📊 Dashboard Principal", 
         "🎯 Análisis por Curva ABC", 
+        "🍽️ Análisis por Servicios",
         "📈 Análisis Avanzado",
         "📤 Exportar Reportes"
     ])
@@ -619,9 +620,12 @@ def show_results():
         show_curva_abc_tab(analyzer)
     
     with tab3:
-        show_advanced_analysis_tab(analyzer)
+        show_services_analysis_tab(analyzer)
     
     with tab4:
+        show_advanced_analysis_tab(analyzer)
+    
+    with tab5:
         show_export_tab(analyzer, data)
     
     # Botón para nuevo análisis
@@ -900,6 +904,129 @@ def show_curva_abc_tab(analyzer):
     
     # Mostrar análisis detallado de la curva seleccionada
     show_detailed_curva_analysis(analyzer, data, selected_curva)
+
+def show_services_analysis_tab(analyzer):
+    """Tab de análisis por servicios"""
+    
+    data = analyzer.data
+    
+    st.markdown("### 🍽️ Análisis por Servicios de Alimentación")
+    
+    # Verificar si hay información de servicios
+    if 'servicio' not in data.columns:
+        st.warning("No hay información de servicios disponible en los datos procesados")
+        return
+    
+    # Análisis por servicios
+    services = data['servicio'].unique()
+    
+    if len(services) <= 1:
+        st.info("Todos los productos pertenecen al mismo servicio o no se detectaron múltiples servicios")
+        return
+    
+    st.markdown(f"""
+    <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-bottom: 2rem;">
+        <strong>📋 Servicios detectados:</strong> {len(services)} servicios diferentes
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Selector de servicio
+    selected_service = st.selectbox(
+        "🔍 Selecciona un servicio para análisis detallado:",
+        options=sorted(services),
+        index=0
+    )
+    
+    # Análisis del servicio seleccionado
+    service_data = data[data['servicio'] == selected_service]
+    
+    if len(service_data) == 0:
+        st.warning(f"No hay datos para el servicio {selected_service}")
+        return
+    
+    # Métricas del servicio
+    col1, col2, col3, col4 = st.columns(4)
+    
+    total_products = len(service_data)
+    critical_count = len(service_data[service_data['estado_stock'] == 'CRÍTICO'])
+    avg_consumption = service_data['consumo_diario'].mean()
+    total_consumption = service_data['consumo_diario'].sum()
+    
+    with col1:
+        st.metric("📦 Productos", total_products)
+    
+    with col2:
+        st.metric("🚨 Críticos", critical_count)
+    
+    with col3:
+        st.metric("⚡ Consumo Promedio", f"{avg_consumption:.1f}")
+    
+    with col4:
+        st.metric("📊 Consumo Total", f"{total_consumption:.1f}")
+    
+    # Distribución por curva en este servicio
+    st.markdown("#### 📊 Distribución por Curva ABC en este Servicio")
+    
+    curva_dist = service_data['curva'].value_counts()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if len(curva_dist) > 0:
+            fig_curva_service = px.pie(
+                values=curva_dist.values,
+                names=curva_dist.index,
+                title=f"Distribución ABC - {selected_service}",
+                color=curva_dist.index,
+                color_discrete_map={
+                    'A': '#FF6B6B',
+                    'B': '#4ECDC4', 
+                    'C': '#45B7D1'
+                }
+            )
+            fig_curva_service.update_traces(textposition='inside', textinfo='percent+label')
+            st.plotly_chart(fig_curva_service, use_container_width=True, key=f"service_curva_{selected_service}")
+    
+    with col2:
+        st.markdown("**Productos por Curva:**")
+        for curva, count in curva_dist.items():
+            pct = (count / total_products * 100)
+            color_icons = {'A': '🔴', 'B': '🟡', 'C': '🟢'}
+            icon = color_icons.get(curva, '⚪')
+            st.markdown(f"{icon} **Curva {curva}**: {count} productos ({pct:.1f}%)")
+    
+    # Top productos más consumidos en este servicio
+    st.markdown("#### 🏆 Top 10 Productos Más Consumidos")
+    
+    top_consumed = service_data.nlargest(10, 'consumo_diario')
+    
+    if len(top_consumed) > 0:
+        st.dataframe(
+            top_consumed[['codigo', 'descripcion', 'curva', 'consumo_diario', 'estado_stock']],
+            width='stretch',
+            hide_index=True,
+            column_config={
+                'codigo': st.column_config.TextColumn('Código', width='small'),
+                'descripcion': st.column_config.TextColumn('Descripción', width='large'),
+                'curva': st.column_config.TextColumn('Curva', width='small'),
+                'consumo_diario': st.column_config.NumberColumn('Consumo Diario', format='%.2f'),
+                'estado_stock': st.column_config.TextColumn('Estado', width='small')
+            }
+        )
+    
+    # Comparación entre servicios
+    st.markdown("#### 📈 Comparación entre Servicios")
+    
+    services_comparison = data.groupby('servicio').agg({
+        'codigo': 'count',
+        'consumo_diario': ['sum', 'mean'],
+        'estado_stock': lambda x: (x == 'CRÍTICO').sum()
+    }).round(2)
+    
+    services_comparison.columns = ['Total Productos', 'Consumo Total', 'Consumo Promedio', 'Productos Críticos']
+    services_comparison = services_comparison.reset_index()
+    
+    st.dataframe(services_comparison, width='stretch', hide_index=True)
 
 def show_detailed_curva_analysis(analyzer, data, curva):
     """Análisis detallado de una curva específica"""
