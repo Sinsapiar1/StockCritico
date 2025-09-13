@@ -702,17 +702,17 @@ def show_main_kpis(analyzer):
     </div>
     """, unsafe_allow_html=True)
     
-    # KPIs principales con explicaciones
+    # KPIs principales con explicaciones (separando productos con/sin consumo)
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.markdown(f"""
         <div class="metric-container">
             <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📦</div>
-            <div class="metric-value">{metrics['total_productos']}</div>
-            <div class="metric-label">Productos Analizados</div>
+            <div class="metric-value">{metrics['productos_con_consumo']}</div>
+            <div class="metric-label">Productos con Consumo</div>
             <div style="color: #7f8c8d; font-size: 0.8rem; margin-top: 0.5rem;">
-                Con stock y consumo válidos
+                De {metrics['total_productos']} total en stock
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -733,7 +733,9 @@ def show_main_kpis(analyzer):
         """, unsafe_allow_html=True)
     
     with col3:
-        avg_coverage = data['dias_cobertura'].mean()
+        # Calcular cobertura promedio SOLO para productos con consumo
+        data_with_consumption = data[data['consumo_diario'] > 0]
+        avg_coverage = data_with_consumption['dias_cobertura'].mean() if len(data_with_consumption) > 0 else 0
         coverage_icon = "📈" if avg_coverage > 15 else "📊" if avg_coverage > 7 else "📉"
         
         st.markdown(f"""
@@ -742,7 +744,7 @@ def show_main_kpis(analyzer):
             <div class="metric-value" style="color: #4ECDC4;">{avg_coverage:.1f}</div>
             <div class="metric-label">Días Cobertura Promedio</div>
             <div style="color: #7f8c8d; font-size: 0.8rem; margin-top: 0.5rem;">
-                Stock actual ÷ consumo diario
+                Solo productos con consumo real
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -760,6 +762,15 @@ def show_main_kpis(analyzer):
             <div style="color: #7f8c8d; font-size: 0.8rem; margin-top: 0.5rem;">
                 Del total de inventario
             </div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Información adicional sobre productos sin consumo
+    if metrics['productos_sin_consumo'] > 0:
+        st.markdown(f"""
+        <div style="background: #f0f8ff; padding: 1rem; border-radius: 8px; border-left: 4px solid #4169e1; margin-top: 2rem;">
+            <strong>📋 Productos Sin Consumo:</strong> {metrics['productos_sin_consumo']} productos en inventario 
+            pero no consumidos en el período analizado. Estos no afectan los cálculos de cobertura.
         </div>
         """, unsafe_allow_html=True)
     

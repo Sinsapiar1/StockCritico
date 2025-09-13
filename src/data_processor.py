@@ -670,20 +670,26 @@ class ERPDataProcessor:
             
             # Hacer merge con stock (OUTER join para incluir TODOS los productos de stock)
             print(f"\n🔗 Cruzando datos ABC con Stock...")
+            
+            # Asegurar que códigos sean strings para merge correcto
+            consumo_consolidado['codigo'] = consumo_consolidado['codigo'].astype(str).str.strip()
+            self.stock_data['codigo'] = self.stock_data['codigo'].astype(str).str.strip()
+            
             analysis = pd.merge(
                 consumo_consolidado,
-                self.stock_data[['codigo', 'stock', 'familia']],
+                self.stock_data[['codigo', 'descripcion', 'stock', 'familia']],  # Incluir descripción del stock
                 on='codigo',
-                how='right'  # RIGHT JOIN: incluye TODOS los productos de stock
+                how='right',  # RIGHT JOIN: incluye TODOS los productos de stock
+                suffixes=('_abc', '_stock')  # Distinguir columnas duplicadas
             )
             
             # Completar datos faltantes para productos sin consumo
-            # Usar descripción del stock si no está en ABC
-            for idx, row in analysis.iterrows():
-                if pd.isna(row['descripcion']) or row['descripcion'] == '':
-                    # Buscar descripción en stock_data original
-                    stock_desc = self.stock_data[self.stock_data['codigo'] == row['codigo']]['descripcion'].iloc[0] if len(self.stock_data[self.stock_data['codigo'] == row['codigo']]) > 0 else 'Producto en inventario'
-                    analysis.at[idx, 'descripcion'] = stock_desc
+            # Usar descripción del stock cuando no hay en ABC
+            analysis['descripcion'] = analysis['descripcion_abc'].fillna(analysis['descripcion_stock'])
+            analysis['descripcion'] = analysis['descripcion'].fillna('Producto en inventario')
+            
+            # Limpiar columnas duplicadas
+            analysis = analysis.drop(['descripcion_abc', 'descripcion_stock'], axis=1, errors='ignore')
             
             analysis['unidad'] = analysis['unidad'].fillna('Und')
             analysis['consumo'] = analysis['consumo'].fillna(0)

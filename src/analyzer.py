@@ -77,8 +77,14 @@ class StockAnalyzer:
         return fig
     
     def create_coverage_by_curva_chart(self) -> go.Figure:
-        """Crea gráfico de cobertura promedio por curva ABC"""
-        coverage_data = self.data.groupby('curva')['dias_cobertura'].agg(['mean', 'median']).reset_index()
+        """Crea gráfico de cobertura promedio por curva ABC (solo productos con consumo)"""
+        # Filtrar solo productos con consumo para gráficos precisos
+        data_with_consumption = self.data[self.data['consumo_diario'] > 0]
+        
+        if len(data_with_consumption) == 0:
+            return self._create_empty_chart("No hay productos con consumo para analizar")
+        
+        coverage_data = data_with_consumption.groupby('curva')['dias_cobertura'].agg(['mean', 'median']).reset_index()
         
         fig = go.Figure()
         
@@ -111,10 +117,14 @@ class StockAnalyzer:
         return fig
     
     def create_critical_products_chart(self) -> go.Figure:
-        """Crea gráfico de productos más críticos"""
-        critical = self.get_critical_products().head(15)
+        """Crea gráfico de productos más críticos (solo con consumo real)"""
+        # Solo productos críticos que tienen consumo real
+        critical_with_consumption = self.data[
+            (self.data['estado_stock'] == 'CRÍTICO') & 
+            (self.data['consumo_diario'] > 0)
+        ].nsmallest(15, 'dias_cobertura')
         
-        if len(critical) == 0:
+        if len(critical_with_consumption) == 0:
             # Crear gráfico vacío si no hay productos críticos
             fig = go.Figure()
             fig.add_annotation(
@@ -127,16 +137,16 @@ class StockAnalyzer:
             return fig
         
         # Truncar descripciones largas
-        critical['descripcion_short'] = critical['descripcion'].apply(
+        critical_with_consumption['descripcion_short'] = critical_with_consumption['descripcion'].apply(
             lambda x: x[:30] + '...' if len(str(x)) > 30 else str(x)
         )
         
         fig = go.Figure(go.Bar(
-            y=critical['descripcion_short'],
-            x=critical['dias_cobertura'],
+            y=critical_with_consumption['descripcion_short'],
+            x=critical_with_consumption['dias_cobertura'],
             orientation='h',
             marker_color='red',
-            text=critical['dias_cobertura'].round(1),
+            text=critical_with_consumption['dias_cobertura'].round(1),
             textposition='auto'
         ))
         
@@ -275,17 +285,27 @@ class StockAnalyzer:
         return suggested
     
     def get_summary_metrics(self) -> Dict:
-        """Obtiene métricas resumidas para dashboard"""
+        """Obtiene métricas resumidas para dashboard (solo productos con consumo)"""
+        
+        # Separar productos con consumo vs sin consumo para métricas precisas
+        data_with_consumption = self.data[self.data['consumo_diario'] > 0]
+        data_no_consumption = self.data[self.data['consumo_diario'] == 0]
+        
+        # Recalcular KPIs solo para productos con consumo
+        total_with_consumption = len(data_with_consumption)
+        critical_with_consumption = len(data_with_consumption[data_with_consumption['estado_stock'] == 'CRÍTICO'])
+        low_with_consumption = len(data_with_consumption[data_with_consumption['estado_stock'] == 'BAJO'])
+        
         return {
-            'total_productos': self.kpis['total_products'],
-            'productos_criticos': self.kpis['critical_products'],
-            'productos_bajo': self.kpis['low_products'],
-            'porcentaje_critico': f"{self.kpis['critical_percentage']:.1f}%",
+            'total_productos': len(self.data),  # Total real
+            'productos_con_consumo': total_with_consumption,  # Solo con consumo
+            'productos_sin_consumo': len(data_no_consumption),  # Sin consumo
+            'productos_criticos': critical_with_consumption,  # Solo críticos con consumo
+            'productos_bajo': low_with_consumption,
+            'porcentaje_critico': f"{(critical_with_consumption / total_with_consumption * 100) if total_with_consumption > 0 else 0:.1f}%",
             'valor_inventario': f"${self.kpis['total_stock_value']:,.0f}",
-            'productos_curva_a': self.kpis['curva_distribution'].get('A', 0),
-            'productos_curva_b': self.kpis['curva_distribution'].get('B', 0),
-            'productos_curva_c': self.kpis['curva_distribution'].get('C', 0),
-            'cobertura_promedio_a': f"{self.kpis['avg_coverage_by_curva'].get('A', 0):.1f} días",
-            'cobertura_promedio_b': f"{self.kpis['avg_coverage_by_curva'].get('B', 0):.1f} días",
-            'cobertura_promedio_c': f"{self.kpis['avg_coverage_by_curva'].get('C', 0):.1f} días"
+            'productos_curva_a': len(data_with_consumption[data_with_consumption['curva'] == 'A']),
+            'productos_curva_b': len(data_with_consumption[data_with_consumption['curva'] == 'B']),
+            'productos_curva_c': len(data_with_consumption[data_with_consumption['curva'] == 'C']),
+            'cobertura_promedio': f"{data_with_consumption['dias_cobertura'].mean():.1f} días" if len(data_with_consumption) > 0 else "N/A"
         }
