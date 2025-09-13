@@ -55,6 +55,8 @@ class ERPDataProcessor:
                             if pd.notna(cell):
                                 print(f"   Col{col_idx}: '{cell}'")
                     
+                    # Detectar servicios y curvas
+                    
                     # Detectar servicio (múltiples patrones)
                     if ("Servicio" in row_str and ":" in row_str) or ("10000" in row_str and "Desayuno" in row_str) or ("10001" in row_str and "Almuerzo" in row_str) or ("10003" in row_str and "Cena" in row_str):
                         current_service = self._extract_service_name(row_str)
@@ -75,8 +77,8 @@ class ERPDataProcessor:
                         print(f"Curva C detectada")
                         continue
                     
-                    # Buscar códigos de producto en cualquier columna
-                    for col_idx in range(min(6, len(row))):
+                    # Buscar códigos de producto en cualquier columna - MEJORADO
+                    for col_idx in range(min(6, len(row))):  # Ampliado de 4 a 6
                         cell = row.iloc[col_idx]
                         if pd.isna(cell):
                             continue
@@ -92,6 +94,7 @@ class ERPDataProcessor:
                                 description = "Sin descripción"
                                 consumption = 0
                                 
+                                # MEJORADA: Búsqueda más flexible de descripción
                                 for desc_col in range(col_idx + 1, len(row)):
                                     desc_cell = row.iloc[desc_col]
                                     if pd.isna(desc_cell):
@@ -100,13 +103,13 @@ class ERPDataProcessor:
                                     desc_str = str(desc_cell).strip()
                                     
                                     # Si es texto largo, probablemente es descripción
-                                    if (len(desc_str) > 5 and 
+                                    if (len(desc_str) > 2 and  # Cambiado de 5 a 2 para casos como "LIMON"
                                         not desc_str.replace('.', '').replace(',', '').isdigit() and
                                         "Total" not in desc_str):
                                         description = desc_str
                                         break
                                 
-                                # Buscar consumo (primer número grande después del código)
+                                # MEJORADA: Búsqueda más flexible de consumo
                                 for cons_col in range(col_idx + 1, len(row)):
                                     cons_cell = row.iloc[cons_col]
                                     if pd.isna(cons_cell):
@@ -120,8 +123,9 @@ class ERPDataProcessor:
                                     except:
                                         continue
                                 
-                                # Si encontramos código + descripción + consumo válido
-                                if description != "Sin descripción" and consumption > 0:
+                                # VALIDACIÓN MÁS FLEXIBLE para casos especiales
+                                if (description != "Sin descripción" and consumption > 0) or \
+                                   (len(str(description).strip()) > 1 and consumption > 0):
                                     product_data = [
                                         str(code), description, "Und", consumption, 
                                         0, 0, current_curva, current_service, 
@@ -377,31 +381,14 @@ class ERPDataProcessor:
     
     def process_stock(self, file_path: str) -> pd.DataFrame:
         """
-        Procesa el archivo de stock MEJORADO - Versión que captura todos los productos
+        Procesa el archivo de stock usando el mismo enfoque exitoso que ABC
         """
         try:
-            print("🔍 Iniciando procesamiento de Stock MEJORADO...")
+            print("Iniciando procesamiento de Stock...")
             
             # Leer archivo
             df = pd.read_excel(file_path, header=None)
-            print(f"📊 Archivo stock leído: {df.shape[0]} filas, {df.shape[1]} columnas")
-            
-            # NUEVO: Conteo de códigos potenciales para debug
-            potential_codes = []
-            for idx, row in df.iterrows():
-                for col_idx in range(min(8, len(row))):  # Buscar en más columnas
-                    cell = row.iloc[col_idx]
-                    if pd.notna(cell):
-                        try:
-                            code = int(float(str(cell).strip()))
-                            if 1 <= code <= 999999:
-                                potential_codes.append((idx, col_idx, code))
-                        except:
-                            continue
-
-            print(f"🎯 CÓDIGOS POTENCIALES DETECTADOS: {len(potential_codes)}")
-            unique_codes = list(set([code[2] for code in potential_codes]))
-            print(f"🎯 CÓDIGOS ÚNICOS POTENCIALES: {len(unique_codes)}")
+            print(f"Archivo stock leído: {df.shape[0]} filas, {df.shape[1]} columnas")
             
             # Debug: mostrar estructura real con más detalle
             print("\n=== MUESTRA ARCHIVO STOCK (DETALLADO) ===")
@@ -431,8 +418,6 @@ class ERPDataProcessor:
             
             stock_data = []
             current_family = "Sin familia"
-            processed_codes = set()  # Para evitar duplicados y hacer tracking
-            skipped_products = []    # Para log de productos que no se procesan
             
             for idx, row in df.iterrows():
                 try:
@@ -441,12 +426,11 @@ class ERPDataProcessor:
                     
                     if self._is_family_header(row_str):
                         current_family = self._extract_family_name(row_str)
-                        print(f"👨‍👩‍👧‍👦 Familia detectada: {current_family}")
+                        print(f"Familia detectada: {current_family}")
                         continue
                     
-                    # MEJORADO: Buscar en MÁS columnas (ampliado de 4 a 6)
-                    product_found = False
-                    for col_idx in range(min(6, len(row))):  # CAMBIO PRINCIPAL: de 4 a 6 columnas
+                    # Buscar productos usando enfoque similar a ABC
+                    for col_idx in range(min(4, len(row))):
                         cell = row.iloc[col_idx]
                         if pd.isna(cell):
                             continue
@@ -456,7 +440,7 @@ class ERPDataProcessor:
                         # Intentar detectar código de producto
                         try:
                             code = int(float(cell_str))
-                            if 1 <= code <= 999999 and str(code) not in processed_codes:
+                            if 1 <= code <= 999999:  # Rango válido de códigos
                                 
                                 # Buscar descripción, unidad y stock
                                 description = "Sin descripción"
@@ -499,61 +483,23 @@ class ERPDataProcessor:
                                     except:
                                         continue
                                 
-                                # MEJORADA: Validación más flexible - acepta productos incluso sin descripción perfecta
-                                if description != "Sin descripción" or len(str(code).strip()) > 0:  # Más flexible
+                                # Si encontramos código + descripción válida
+                                if description != "Sin descripción":
                                     product_data = [
                                         str(code), description, unit, stock_value, 
                                         price, total, current_family
                                     ]
                                     stock_data.append(product_data)
-                                    processed_codes.add(str(code))
-                                    print(f"✅ STOCK: {code} - {description[:30]} - Stock: {stock_value}")
-                                    product_found = True
+                                    print(f"✓ STOCK: {code} - {description[:30]} - Stock: {stock_value}")
                                     break  # No buscar más en esta fila
-                                else:
-                                    # Log productos que tienen código pero no se procesan
-                                    skipped_products.append({
-                                        'fila': idx,
-                                        'codigo': code,
-                                        'descripcion': description,
-                                        'razon': 'Descripción o datos insuficientes'
-                                    })
                         
                         except ValueError:
                             continue
-                    
-                    # NUEVO: Log si no se procesó producto pero hay códigos potenciales
-                    if not product_found:
-                        row_codes = [code for (r_idx, c_idx, code) in potential_codes if r_idx == idx]
-                        if row_codes:
-                            skipped_products.append({
-                                'fila': idx,
-                                'codigo': row_codes[0],
-                                'razon': 'Producto con código potencial no procesado',
-                                'row_data': row_str[:100]
-                            })
                 
                 except Exception as e:
                     continue
             
-            # NUEVO: Reporte final de debug
-            print(f"\n📊 REPORTE FINAL DE PROCESAMIENTO:")
-            print(f"   • Productos procesados exitosamente: {len(stock_data)}")
-            print(f"   • Códigos únicos procesados: {len(processed_codes)}")
-            print(f"   • Productos saltados: {len(skipped_products)}")
-
-            if len(skipped_products) > 0:
-                print(f"\n⚠️  PRODUCTOS SALTADOS (primeros 5):")
-                for skip in skipped_products[:5]:
-                    print(f"   Fila {skip['fila']}: {skip['codigo']} - {skip['razon']}")
-
-            # Verificar diferencia con potenciales
-            codes_difference = len(unique_codes) - len(processed_codes)
-            if codes_difference > 0:
-                print(f"\n🔍 ATENCIÓN: {codes_difference} códigos potenciales no fueron procesados")
-                print("   Esto podría explicar los productos faltantes!")
-            
-            print(f"Productos de stock encontrados: {len(stock_data)}")
+            print(f"\nProductos de stock encontrados: {len(stock_data)}")
             
             if stock_data:
                 columns = ['codigo', 'descripcion', 'unidad', 'stock', 'precio', 'total', 'familia']
@@ -615,101 +561,80 @@ class ERPDataProcessor:
             precio = 0
             total = 0
             
-        
-            # Buscar códigos de producto en cualquier columna (MEJORADO para casos especiales)
-            for col_idx in range(min(6, len(row))):
+            # Buscar código de producto
+            for col_idx in range(min(4, len(row))):
                 cell = row.iloc[col_idx]
                 if pd.isna(cell):
                     continue
                 
                 cell_str = str(cell).strip()
                 
-                # Intentar detectar código de producto
                 try:
                     code = int(float(cell_str))
                     if 1 <= code <= 999999:
+                        codigo = str(code)
                         
-                        # CASO ESPECIAL: Si código está en Col1 o posterior
-                        if col_idx >= 1:
-                            # Descripción en columna siguiente
-                            if col_idx + 1 < len(row) and pd.notna(row.iloc[col_idx + 1]):
-                                description = str(row.iloc[col_idx + 1]).strip()
-                            else:
-                                description = "Sin descripción"
+                        # Buscar descripción, unidad y valores en columnas siguientes
+                        for search_col in range(col_idx + 1, len(row)):
+                            search_cell = row.iloc[search_col]
+                            if pd.isna(search_cell):
+                                continue
                             
-                            # Consumo en Col4 (casos especiales)
-                            if col_idx + 3 < len(row) and pd.notna(row.iloc[col_idx + 3]):
-                                try:
-                                    consumption = float(str(row.iloc[col_idx + 3]).replace(',', '.'))
-                                except:
-                                    consumption = 0
-                            else:
-                                consumption = 0
-                        else:
-                            # LÓGICA ORIGINAL para códigos en Col0
-                            description = "Sin descripción"
-                            consumption = 0
+                            search_str = str(search_cell).strip()
                             
-                            # Buscar descripción
-                            for desc_col in range(col_idx + 1, len(row)):
-                                desc_cell = row.iloc[desc_col]
-                                if pd.isna(desc_cell):
-                                    continue
-                                
-                                desc_str = str(desc_cell).strip()
-                                if (len(desc_str) > 5 and 
-                                    not desc_str.replace('.', '').replace(',', '').isdigit() and
-                                    "Total" not in desc_str):
-                                    description = desc_str
-                                    break
+                            # Buscar descripción (texto largo, no número)
+                            if (descripcion == "Sin descripción" and 
+                                len(search_str) > 5 and 
+                                not search_str.replace('.', '').replace(',', '').isdigit() and
+                                "Total" not in search_str):
+                                descripcion = search_str
+                                continue
                             
-                            # Buscar consumo
-                            for cons_col in range(col_idx + 1, len(row)):
-                                cons_cell = row.iloc[cons_col]
-                                if pd.isna(cons_cell):
-                                    continue
-                                
-                                try:
-                                    cons_val = float(str(cons_cell).replace(',', '.'))
-                                    if cons_val > 0:
-                                        consumption = cons_val
-                                        break
-                                except:
-                                    continue
+                            # Buscar unidad (texto corto)
+                            if (unidad == "Und" and 
+                                len(search_str) <= 5 and 
+                                not search_str.replace('.', '').replace(',', '').isdigit()):
+                                unidad = search_str
+                                continue
+                            
+                            # Buscar valores numéricos (stock, precio, total)
+                            try:
+                                numeric_val = float(search_str.replace(',', '.'))
+                                if numeric_val >= 0:
+                                    if stock == 0:
+                                        stock = numeric_val
+                                    elif precio == 0:
+                                        precio = numeric_val
+                                    elif total == 0:
+                                        total = numeric_val
+                            except:
+                                continue
                         
-                        # Si encontramos código + descripción + consumo válido
-                        if description != "Sin descripción" and consumption > 0:
-                            product_data = [
-                                str(code), description, "Und", consumption, 
-                                0, 0, current_curva, current_service, 
-                                self.analysis_period_start or "01/09/2025", 
-                                self.analysis_period_end or "08/09/2025"
-                            ]
-                            consolidated_data.append(product_data)
-                            print(f"✓ PRODUCTO: {code} - {description[:30]} - Consumo: {consumption}")
-                            break  # No buscar más en esta fila
+                        # Validar que tenemos datos mínimos
+                        if descripcion != "Sin descripción":
+                            print(f"✓ STOCK: {codigo} - {descripcion[:30]} - Stock: {stock}")
+                            return [codigo, descripcion, unidad, stock, precio, total, family]
+                        
+                        break  # No buscar más códigos en esta fila
                 
                 except ValueError:
                     continue
+            
+            return None
+            
+        except Exception as e:
+            return None
     
     def _clean_stock_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Limpia DataFrame de stock CON LOGGING"""
-        print(f"\n🧹 Limpiando DataFrame de stock...")
-        print(f"   Antes de limpiar: {len(df)} productos")
-        
+        """Limpia DataFrame de stock"""
         # Eliminar filas sin código
-        initial_count = len(df)
         df = df.dropna(subset=['codigo'])
-        after_codigo = len(df)
-        print(f"   Después de eliminar sin código: {after_codigo} (eliminados: {initial_count - after_codigo})")
         
         # Limpiar códigos
         df['codigo'] = df['codigo'].astype(str).str.strip()
         
         # Asegurar que stock es numérico
         df['stock'] = pd.to_numeric(df['stock'], errors='coerce').fillna(0)
-        
-        print(f"   Final después de limpiar: {len(df)} productos")
         
         return df.reset_index(drop=True)
     
@@ -845,7 +770,7 @@ class ERPDataProcessor:
             # Mostrar estadísticas básicas
             print("Distribución por estado:")
             print(analysis['estado_stock'].value_counts())
-
+            
             # DEBUG DIRECTO - TEMPORAL
             print(f"\n🔍 DEBUG PRODUCTOS FALTANTES:")
             test_codes = ['453', '641']
@@ -868,12 +793,12 @@ class ERPDataProcessor:
                 if in_final:
                     row = analysis[analysis['codigo'].astype(str).str.strip() == code].iloc[0]
                     print(f"   Estado: {row['estado_stock']}")
+                    print(f"   Descripción: {row['descripcion']}")
+                    print(f"   Consumo: {row['consumo']}")
                 else:
                     print(f"   🚨 SE PERDIÓ EN EL PROCESO")
             
             self.consolidated_data = analysis
-
-            
             return analysis
             
         except Exception as e:
