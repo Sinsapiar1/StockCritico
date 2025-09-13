@@ -46,8 +46,14 @@ class ERPDataProcessor:
             
             for idx, row in df.iterrows():
                 try:
-                    # Detectar servicios y curvas
+                    # DEBUG ESPECÍFICO para productos problema
                     row_str = ' '.join([str(cell) for cell in row if pd.notna(cell)])
+                    if any(code in row_str for code in ['453', '641']):
+                        print(f"\n🔍 DEBUG FILA {idx} - PRODUCTO PROBLEMA:")
+                        print(f"   Fila completa: {row_str}")
+                        for col_idx, cell in enumerate(row):
+                            if pd.notna(cell):
+                                print(f"   Col{col_idx}: '{cell}'")
                     
                     # Detectar servicio (múltiples patrones)
                     if ("Servicio" in row_str and ":" in row_str) or ("10000" in row_str and "Desayuno" in row_str) or ("10001" in row_str and "Almuerzo" in row_str) or ("10003" in row_str and "Cena" in row_str):
