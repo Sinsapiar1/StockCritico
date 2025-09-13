@@ -630,40 +630,60 @@ class ERPDataProcessor:
             for _, product in top_consumers.iterrows():
                 print(f"   📈 {product['codigo']}: {product['consumo']:.1f} total ÷ {days_period} días = {product['consumo_diario']:.2f}/día")
             
-            # Hacer merge con stock (inner join para tener solo productos que están en ambos)
+            # Hacer merge con stock (OUTER join para incluir TODOS los productos de stock)
             print(f"\n🔗 Cruzando datos ABC con Stock...")
             analysis = pd.merge(
                 consumo_consolidado,
                 self.stock_data[['codigo', 'stock', 'familia']],
                 on='codigo',
-                how='inner'
+                how='right'  # RIGHT JOIN: incluye TODOS los productos de stock
             )
+            
+            # Completar datos faltantes para productos sin consumo
+            analysis['descripcion'] = analysis['descripcion'].fillna('Sin descripción en ABC')
+            analysis['unidad'] = analysis['unidad'].fillna('Und')
+            analysis['consumo'] = analysis['consumo'].fillna(0)
+            analysis['curva'] = analysis['curva'].fillna('Sin Curva')
+            analysis['servicio'] = analysis['servicio'].fillna('Sin Servicio')
+            analysis['consumo_diario'] = analysis['consumo_diario'].fillna(0)
             
             print(f"✅ Productos después del merge: {len(analysis)}")
             
             if len(analysis) == 0:
                 raise Exception("No hay productos en común entre Curva ABC y Stock. Verificar códigos de productos.")
             
-            # Calcular días de cobertura EXPERTO
+            # Calcular días de cobertura EXPERTO (incluyendo productos sin consumo)
             print(f"\n⏱️  Calculando días de cobertura...")
             analysis['dias_cobertura'] = analysis.apply(
                 lambda row: row['stock'] / row['consumo_diario'] 
-                if row['consumo_diario'] > 0 else 999, axis=1
+                if row['consumo_diario'] > 0 else 999, axis=1  # 999 = Sin consumo en período
             )
             
-            # Mostrar ejemplos del cálculo de cobertura
-            sample_products = analysis.head(3)
-            for _, product in sample_products.iterrows():
-                if product['consumo_diario'] > 0:
-                    print(f"   ⏰ {product['codigo']}: {product['stock']:.1f} stock ÷ {product['consumo_diario']:.2f}/día = {product['dias_cobertura']:.1f} días")
+            # Contar productos con y sin consumo
+            productos_con_consumo = len(analysis[analysis['consumo_diario'] > 0])
+            productos_sin_consumo = len(analysis[analysis['consumo_diario'] == 0])
             
-            # Estadísticas del análisis
-            print(f"\n📊 ESTADÍSTICAS DEL ANÁLISIS:")
-            print(f"   • Cobertura promedio: {analysis['dias_cobertura'].mean():.1f} días")
-            print(f"   • Cobertura mínima: {analysis['dias_cobertura'].min():.1f} días")
-            print(f"   • Cobertura máxima: {analysis['dias_cobertura'].max():.1f} días")
-            print(f"   • Productos con <3 días: {len(analysis[analysis['dias_cobertura'] < 3])}")
-            print(f"   • Productos con <7 días: {len(analysis[analysis['dias_cobertura'] < 7])}")
+            print(f"\n📊 ESTADÍSTICAS COMPLETAS DEL ANÁLISIS:")
+            print(f"   • Total productos en stock: {len(analysis)}")
+            print(f"   • Con consumo en período: {productos_con_consumo}")
+            print(f"   • Sin consumo en período: {productos_sin_consumo}")
+            
+            # Estadísticas solo para productos con consumo
+            analysis_with_consumption = analysis[analysis['consumo_diario'] > 0]
+            if len(analysis_with_consumption) > 0:
+                print(f"   • Cobertura promedio (con consumo): {analysis_with_consumption['dias_cobertura'].mean():.1f} días")
+                print(f"   • Productos con <3 días: {len(analysis_with_consumption[analysis_with_consumption['dias_cobertura'] < 3])}")
+                print(f"   • Productos con <7 días: {len(analysis_with_consumption[analysis_with_consumption['dias_cobertura'] < 7])}")
+            
+            # Mostrar ejemplos del cálculo de cobertura
+            sample_with_consumption = analysis_with_consumption.head(3) if len(analysis_with_consumption) > 0 else pd.DataFrame()
+            for _, product in sample_with_consumption.iterrows():
+                print(f"   ⏰ {product['codigo']}: {product['stock']:.1f} stock ÷ {product['consumo_diario']:.2f}/día = {product['dias_cobertura']:.1f} días")
+            
+            # Ejemplos de productos sin consumo
+            sample_no_consumption = analysis[analysis['consumo_diario'] == 0].head(2)
+            for _, product in sample_no_consumption.iterrows():
+                print(f"   📦 {product['codigo']}: Sin consumo en período 01/09-08/09/2025")
             
             # Clasificar estado según curva ABC
             analysis['estado_stock'] = analysis.apply(self._classify_stock_status, axis=1)
@@ -685,12 +705,17 @@ class ERPDataProcessor:
             raise Exception(f"Error calculando análisis: {str(e)}")
     
     def _classify_stock_status(self, row) -> str:
-        """Clasifica estado del stock según curva"""
+        """Clasifica estado del stock según curva (incluye productos sin consumo)"""
         try:
             dias = row['dias_cobertura']
             curva = row['curva']
+            consumo_diario = row.get('consumo_diario', 0)
             
-            # Umbrales por curva
+            # Productos sin consumo en el período
+            if consumo_diario == 0 or dias >= 999:
+                return 'SIN CONSUMO EN PERÍODO'
+            
+            # Umbrales por curva para productos con consumo
             umbrales = {'A': 3, 'B': 5, 'C': 7}
             umbral = umbrales.get(curva, 5)
             

@@ -220,11 +220,18 @@ class ExcelExporter:
             ws.write(2, col_num, value, self.formats['header'])
     
     def _create_stock_analysis_sheet(self, writer, data, processor=None):
-        """Crea hoja de análisis de stock actual COMPLETO"""
+        """Crea hoja de análisis de stock actual COMPLETO con explicaciones"""
         ws = writer.book.add_worksheet('Stock Actual Completo')
         
         ws.merge_range('A1:H1', 'STOCK ACTUAL COMPLETO - ANÁLISIS DE COBERTURA', self.formats['title'])
-        ws.merge_range('A2:H2', 'Incluye TODOS los productos del stock, tengan o no datos de consumo', self.formats['border'])
+        ws.merge_range('A2:H2', f'Generado el: {datetime.now().strftime("%d/%m/%Y %H:%M")} | Período: 01/09-08/09/2025 (8 días)', self.formats['border'])
+        
+        # Explicación de metodología
+        ws.merge_range('A4:H4', 'METODOLOGÍA DE CÁLCULO', self.formats['header'])
+        ws.write('A5', '1. Consumo Diario = Consumo Total del Período ÷ 8 días', self.formats['border'])
+        ws.write('A6', '2. Días de Cobertura = Stock Actual ÷ Consumo Diario', self.formats['border'])
+        ws.write('A7', '3. Estado = Crítico si cobertura < umbral por Curva ABC', self.formats['border'])
+        ws.write('A8', '4. SIN CONSUMO = Productos no consumidos en el período analizado', self.formats['border'])
         
         # Obtener TODOS los productos de stock (no solo los que tienen consumo)
         # Aquí necesitamos acceder al stock_data original del procesador
@@ -259,10 +266,10 @@ class ExcelExporter:
         headers = ['Código', 'Descripción', 'Stock Actual', 'Consumo Diario', 'Días Cobertura', 'Estado', 'Curva ABC', 'Observaciones']
         
         for col_num, header in enumerate(headers):
-            ws.write(2, col_num, header, self.formats['header'])
+            ws.write(10, col_num, header, self.formats['header'])  # Fila 10 para dejar espacio a explicaciones
         
-        # Datos
-        for row_num, row_data in enumerate(stock_analysis, 3):
+        # Datos (empezar en fila 11)
+        for row_num, row_data in enumerate(stock_analysis, 11):
             for col_num, value in enumerate(row_data):
                 # Formatear según el estado
                 if col_num == 5:  # Columna de estado
@@ -270,8 +277,12 @@ class ExcelExporter:
                         cell_format = self.formats['critical']
                     elif value == 'BAJO':
                         cell_format = self.formats['warning']
-                    elif value == 'SIN DATOS CONSUMO':
-                        cell_format = self.formats['border']  # Formato neutro
+                    elif value == 'SIN CONSUMO EN PERÍODO':
+                        # Crear formato especial para sin consumo
+                        no_consumption_format = self.workbook.add_format({
+                            'bg_color': '#E6E6FA', 'font_color': '#4B0082', 'border': 1
+                        })
+                        cell_format = no_consumption_format
                     else:
                         cell_format = self.formats['normal']
                 else:
@@ -289,23 +300,38 @@ class ExcelExporter:
         ws.set_column('G:G', 30)  # Observaciones
         
         # Agregar resumen al final
-        summary_row = len(stock_analysis) + 5
-        
-        ws.merge_range(f'A{summary_row}:G{summary_row}', 'RESUMEN DE STOCK ACTUAL', self.formats['title'])
+        summary_row = len(stock_analysis) + 15
         
         # Calcular estadísticas
         total_productos = len(stock_analysis)
-        productos_con_consumo = len([x for x in stock_analysis if x[3] != "N/A"])
+        productos_con_consumo = len([x for x in stock_analysis if x[3] != 0 and x[3] != "N/A"])
         productos_sin_consumo = total_productos - productos_con_consumo
+        productos_criticos = len([x for x in stock_analysis if x[5] == 'CRÍTICO'])
         
-        ws.write(summary_row + 1, 0, 'Total de Productos:', self.formats['header'])
+        ws.merge_range(f'A{summary_row}:H{summary_row}', 'RESUMEN EJECUTIVO', self.formats['title'])
+        
+        ws.write(summary_row + 1, 0, 'Total Productos en Stock:', self.formats['header'])
         ws.write(summary_row + 1, 1, total_productos, self.formats['border'])
+        ws.write(summary_row + 1, 2, 'TODOS los productos del inventario', self.formats['border'])
         
-        ws.write(summary_row + 2, 0, 'Con Datos de Consumo:', self.formats['header'])
+        ws.write(summary_row + 2, 0, 'Con Consumo en Período:', self.formats['header'])
         ws.write(summary_row + 2, 1, productos_con_consumo, self.formats['border'])
+        ws.write(summary_row + 2, 2, 'Productos que SÍ se consumieron entre 01/09-08/09/2025', self.formats['border'])
         
-        ws.write(summary_row + 3, 0, 'Sin Datos de Consumo:', self.formats['header'])
+        ws.write(summary_row + 3, 0, 'Sin Consumo en Período:', self.formats['header'])
         ws.write(summary_row + 3, 1, productos_sin_consumo, self.formats['border'])
+        ws.write(summary_row + 3, 2, 'Productos que NO se consumieron en esas fechas', self.formats['border'])
+        
+        ws.write(summary_row + 4, 0, 'Productos Críticos:', self.formats['header'])
+        ws.write(summary_row + 4, 1, productos_criticos, self.formats['critical'])
+        ws.write(summary_row + 4, 2, 'Requieren reposición inmediata', self.formats['border'])
+        
+        # Explicación de estados
+        ws.merge_range(f'A{summary_row + 6}:H{summary_row + 6}', 'EXPLICACIÓN DE ESTADOS', self.formats['header'])
+        ws.write(summary_row + 7, 0, 'CRÍTICO:', self.formats['critical'])
+        ws.write(summary_row + 7, 1, 'Stock se agotará pronto según consumo', self.formats['border'])
+        ws.write(summary_row + 8, 0, 'SIN CONSUMO:', self.formats['border'])
+        ws.write(summary_row + 8, 1, 'No se consumió en período 01/09-08/09/2025', self.formats['border'])
     
     def _generate_replenishment_data(self, data):
         """Genera datos de reposición"""
