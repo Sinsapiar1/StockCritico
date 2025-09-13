@@ -639,15 +639,10 @@ class ERPDataProcessor:
         return df.reset_index(drop=True)
     
     def calculate_coverage_analysis(self, days_period: int = 8) -> pd.DataFrame:
-        """
-        Calcula análisis de cobertura EXPERTO combinando datos ABC y Stock
+        print(f"\n🚨 INICIANDO ANÁLISIS DE COBERTURA")
+        print(f"📊 ABC disponible: {len(self.curva_abc_data) if self.curva_abc_data is not None else 'None'}")
+        print(f"📦 Stock disponible: {len(self.stock_data) if self.stock_data is not None else 'None'}")
         
-        METODOLOGÍA:
-        1. Consolida consumo total por producto (suma todos los servicios)
-        2. Calcula consumo promedio diario = Consumo Total ÷ Días del Período
-        3. Calcula días de cobertura = Stock Actual ÷ Consumo Promedio Diario
-        4. Clasifica criticidad según curva ABC y días de cobertura
-        """
         try:
             if self.curva_abc_data is None or self.stock_data is None:
                 raise Exception("Debe procesar ambos archivos primero")
@@ -799,12 +794,13 @@ class ERPDataProcessor:
                     print(f"   🚨 SE PERDIÓ EN EL PROCESO")
             
             self.consolidated_data = analysis
+            print(f"🎉 LLEGUÉ AL FINAL DEL ANÁLISIS - {len(analysis)} productos")
             return analysis
-            
-        except Exception as e:
-            print(f"Error en calculate_coverage_analysis: {str(e)}")
-            raise Exception(f"Error calculando análisis: {str(e)}")
     
+        except Exception as e:
+            print(f"💥 ERROR EN EL ANÁLISIS: {str(e)}")
+            raise e
+            
     def _classify_stock_status(self, row) -> str:
         """Clasifica estado del stock según curva (incluye productos sin consumo)"""
         try:
