@@ -76,7 +76,7 @@ class ERPDataProcessor:
                         continue
                     
                     # Buscar códigos de producto en cualquier columna
-                    for col_idx in range(min(4, len(row))):
+                    for col_idx in range(min(6, len(row))):
                         cell = row.iloc[col_idx]
                         if pd.isna(cell):
                             continue
@@ -615,69 +615,82 @@ class ERPDataProcessor:
             precio = 0
             total = 0
             
-            # Buscar código de producto
-            for col_idx in range(min(4, len(row))):
+        
+            # Buscar códigos de producto en cualquier columna (MEJORADO para casos especiales)
+            for col_idx in range(min(6, len(row))):
                 cell = row.iloc[col_idx]
                 if pd.isna(cell):
                     continue
                 
                 cell_str = str(cell).strip()
                 
+                # Intentar detectar código de producto
                 try:
                     code = int(float(cell_str))
                     if 1 <= code <= 999999:
-                        codigo = str(code)
                         
-                        # Buscar descripción, unidad y valores en columnas siguientes
-                        for search_col in range(col_idx + 1, len(row)):
-                            search_cell = row.iloc[search_col]
-                            if pd.isna(search_cell):
-                                continue
+                        # CASO ESPECIAL: Si código está en Col1 o posterior
+                        if col_idx >= 1:
+                            # Descripción en columna siguiente
+                            if col_idx + 1 < len(row) and pd.notna(row.iloc[col_idx + 1]):
+                                description = str(row.iloc[col_idx + 1]).strip()
+                            else:
+                                description = "Sin descripción"
                             
-                            search_str = str(search_cell).strip()
+                            # Consumo en Col4 (casos especiales)
+                            if col_idx + 3 < len(row) and pd.notna(row.iloc[col_idx + 3]):
+                                try:
+                                    consumption = float(str(row.iloc[col_idx + 3]).replace(',', '.'))
+                                except:
+                                    consumption = 0
+                            else:
+                                consumption = 0
+                        else:
+                            # LÓGICA ORIGINAL para códigos en Col0
+                            description = "Sin descripción"
+                            consumption = 0
                             
-                            # Buscar descripción (texto largo, no número)
-                            if (descripcion == "Sin descripción" and 
-                                len(search_str) > 5 and 
-                                not search_str.replace('.', '').replace(',', '').isdigit() and
-                                "Total" not in search_str):
-                                descripcion = search_str
-                                continue
+                            # Buscar descripción
+                            for desc_col in range(col_idx + 1, len(row)):
+                                desc_cell = row.iloc[desc_col]
+                                if pd.isna(desc_cell):
+                                    continue
+                                
+                                desc_str = str(desc_cell).strip()
+                                if (len(desc_str) > 5 and 
+                                    not desc_str.replace('.', '').replace(',', '').isdigit() and
+                                    "Total" not in desc_str):
+                                    description = desc_str
+                                    break
                             
-                            # Buscar unidad (texto corto)
-                            if (unidad == "Und" and 
-                                len(search_str) <= 5 and 
-                                not search_str.replace('.', '').replace(',', '').isdigit()):
-                                unidad = search_str
-                                continue
-                            
-                            # Buscar valores numéricos (stock, precio, total)
-                            try:
-                                numeric_val = float(search_str.replace(',', '.'))
-                                if numeric_val >= 0:
-                                    if stock == 0:
-                                        stock = numeric_val
-                                    elif precio == 0:
-                                        precio = numeric_val
-                                    elif total == 0:
-                                        total = numeric_val
-                            except:
-                                continue
+                            # Buscar consumo
+                            for cons_col in range(col_idx + 1, len(row)):
+                                cons_cell = row.iloc[cons_col]
+                                if pd.isna(cons_cell):
+                                    continue
+                                
+                                try:
+                                    cons_val = float(str(cons_cell).replace(',', '.'))
+                                    if cons_val > 0:
+                                        consumption = cons_val
+                                        break
+                                except:
+                                    continue
                         
-                        # Validar que tenemos datos mínimos
-                        if descripcion != "Sin descripción":
-                            print(f"✓ STOCK: {codigo} - {descripcion[:30]} - Stock: {stock}")
-                            return [codigo, descripcion, unidad, stock, precio, total, family]
-                        
-                        break  # No buscar más códigos en esta fila
+                        # Si encontramos código + descripción + consumo válido
+                        if description != "Sin descripción" and consumption > 0:
+                            product_data = [
+                                str(code), description, "Und", consumption, 
+                                0, 0, current_curva, current_service, 
+                                self.analysis_period_start or "01/09/2025", 
+                                self.analysis_period_end or "08/09/2025"
+                            ]
+                            consolidated_data.append(product_data)
+                            print(f"✓ PRODUCTO: {code} - {description[:30]} - Consumo: {consumption}")
+                            break  # No buscar más en esta fila
                 
                 except ValueError:
                     continue
-            
-            return None
-            
-        except Exception as e:
-            return None
     
     def _clean_stock_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """Limpia DataFrame de stock CON LOGGING"""
