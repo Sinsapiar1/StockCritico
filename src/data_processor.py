@@ -826,8 +826,35 @@ class ERPDataProcessor:
             # Mostrar estadísticas básicas
             print("Distribución por estado:")
             print(analysis['estado_stock'].value_counts())
+
+            # DEBUG DIRECTO - TEMPORAL
+            print(f"\n🔍 DEBUG PRODUCTOS FALTANTES:")
+            test_codes = ['453', '641']
+            
+            for code in test_codes:
+                print(f"\n📦 Producto {code}:")
+                
+                # ¿Está en ABC?
+                in_abc = self.curva_abc_data['codigo'].astype(str).str.strip().eq(code).any()
+                print(f"   ABC: {'✅' if in_abc else '❌'}")
+                
+                # ¿Está en Stock?
+                in_stock = self.stock_data['codigo'].astype(str).str.strip().eq(code).any()
+                print(f"   Stock: {'✅' if in_stock else '❌'}")
+                
+                # ¿Está en análisis final?
+                in_final = analysis['codigo'].astype(str).str.strip().eq(code).any()
+                print(f"   Final: {'✅' if in_final else '❌'}")
+                
+                if in_final:
+                    row = analysis[analysis['codigo'].astype(str).str.strip() == code].iloc[0]
+                    print(f"   Estado: {row['estado_stock']}")
+                else:
+                    print(f"   🚨 SE PERDIÓ EN EL PROCESO")
             
             self.consolidated_data = analysis
+
+            
             return analysis
             
         except Exception as e:
